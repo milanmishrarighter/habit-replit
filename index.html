@@ -2354,8 +2354,16 @@
                 const response = await dbx.filesDownload({path: '/' + filename});
                 // Correct way to get file content from Dropbox API
                 const fileContent = new TextDecoder().decode(response.result.fileBinary);
-                console.log(`Successfully read ${filename} from Dropbox`);
-                return JSON.parse(fileContent);
+                console.log(`Dropbox file content length: ${fileContent.length} characters`);
+                console.log(`Dropbox file preview: ${fileContent.substring(0, 100)}...`);
+                
+                if (!fileContent || fileContent.trim() === '') {
+                    throw new Error('Dropbox returned empty file content');
+                }
+                
+                const parsedData = JSON.parse(fileContent);
+                console.log(`Successfully read and parsed ${filename} from Dropbox`);
+                return parsedData;
             } catch (error) {
                 console.error(`Error reading ${filename} from Dropbox:`, error);
                 throw error;
