@@ -2220,41 +2220,9 @@
         // Load test data function - fetch from Dropbox integration
         async function loadTestData() {
             try {
-                console.log('Loading test data from Dropbox...');
-                
-                // Try to read from Dropbox first
-                let data;
-                try {
-                    data = await readFromDropbox('habit-tracker-data.json');
-                    console.log('Successfully loaded data from Dropbox');
-                } catch (dropboxError) {
-                    console.log('Failed to load from Dropbox, trying local fallback:', dropboxError);
-                    // Fallback to local file if Dropbox fails
-                    try {
-                        const response = await fetch('./habit-tracker-data.json');
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        const textContent = await response.text();
-                        if (textContent.startsWith('<!DOCTYPE')) {
-                            throw new Error('Received HTML instead of JSON - file not found');
-                        }
-                        data = JSON.parse(textContent);
-                        console.log('Successfully loaded data from local file');
-                    } catch (localError) {
-                        console.log('Local file also failed, using fallback test data:', localError);
-                        // Use inline test data as final fallback
-                        data = {
-                            journalEntries: {},
-                            habits: [],
-                            finesStatus: [],
-                            dailyHabitTracking: {}
-                        };
-                        console.log('Using empty fallback data structure');
-                    }
-                }
-                
-                console.log('Test data loaded:', data);
+                console.log('Loading data from Dropbox...');
+                const data = await readFromDropbox('habit-tracker-data.json');
+                console.log('Successfully loaded data from Dropbox');
                 
                 // Load data into localStorage
                 localStorage.setItem('journalEntries', JSON.stringify(data.journalEntries || {}));
@@ -2262,13 +2230,13 @@
                 localStorage.setItem('finesStatus', JSON.stringify(data.finesStatus || []));
                 localStorage.setItem('dailyHabitTracking', JSON.stringify(data.dailyHabitTracking || {}));
                 
-                console.log('Test data loaded into localStorage');
+                console.log('Data loaded into localStorage from Dropbox');
                 
                 // Clear caches so new data is used
                 clearCountsCache();
                 
-                // Test that warnings work with the new data
-                console.log('Testing warnings with new data...');
+                // Test that warnings work with the loaded data
+                console.log('Testing warnings with loaded data...');
                 data.habits.forEach(habit => {
                     const warnings = calculateWarnings(habit.id);
                     console.log(`Warnings for ${habit.name} (${habit.id}):`, warnings);
@@ -2276,7 +2244,16 @@
                 
                 return true;
             } catch (error) {
-                console.error('Error loading test data:', error);
+                console.error('Failed to load data from Dropbox:', error);
+                console.log('No fallback - app requires Dropbox authentication to access data');
+                
+                // Clear any existing local data to prevent stale data usage
+                localStorage.removeItem('journalEntries');
+                localStorage.removeItem('habits');
+                localStorage.removeItem('finesStatus');
+                localStorage.removeItem('dailyHabitTracking');
+                
+                console.log('Local storage cleared - connect to Dropbox to access your data');
                 return false;
             }
         }
