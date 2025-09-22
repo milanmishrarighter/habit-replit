@@ -2352,18 +2352,9 @@
             try {
                 console.log(`Reading ${filename} from Dropbox...`);
                 const response = await dbx.filesDownload({path: '/' + filename});
-                // Correct way to get file content from Dropbox API
-                const fileContent = new TextDecoder().decode(response.result.fileBinary);
-                console.log(`Dropbox file content length: ${fileContent.length} characters`);
-                console.log(`Dropbox file preview: ${fileContent.substring(0, 100)}...`);
-                
-                if (!fileContent || fileContent.trim() === '') {
-                    throw new Error('Dropbox returned empty file content');
-                }
-                
-                const parsedData = JSON.parse(fileContent);
-                console.log(`Successfully read and parsed ${filename} from Dropbox`);
-                return parsedData;
+                const fileContent = await response.result.fileBinary.text();
+                console.log(`Successfully read ${filename} from Dropbox`);
+                return JSON.parse(fileContent);
             } catch (error) {
                 console.error(`Error reading ${filename} from Dropbox:`, error);
                 throw error;
@@ -2414,14 +2405,20 @@
 
         function updateAuthStatus() {
             // Status is now handled by the pinned sync buttons container
-            // No need for floating status div anymore
+            // Keep buttons always visible, just change their states
+            
+            const container = document.getElementById('sync-buttons-container-fixed');
+            if (!container) return;
+            
+            // Always show the container
+            container.style.display = 'block';
             
             if (isAuthenticated) {
-                // Add sync button when connected
-                createSyncButton();
+                // Show connected state
+                updateSyncButtonsForConnectedState();
             } else {
-                // Remove sync button when disconnected
-                removeSyncButton();
+                // Show disconnected state - but keep buttons visible
+                updateSyncButtonsForDisconnectedState();
             }
         }
 
@@ -2462,15 +2459,17 @@
         }
 
         // Sync Button Functions
+        // Keep createSyncButton for compatibility but redirect to connected state
         function createSyncButton() {
-            // Remove existing sync button first
-            removeSyncButton();
-            
+            updateSyncButtonsForConnectedState();
+        }
+
+        function updateSyncButtonsForConnectedState() {
             const container = document.getElementById('sync-buttons-container-fixed');
             if (!container) return;
             
-            // Show the container
-            container.style.display = 'block';
+            // Clear and rebuild for connected state
+            container.innerHTML = '';
             
             const syncBtn = document.createElement('div');
             syncBtn.id = 'manual-sync-btn';
@@ -2514,16 +2513,57 @@
             container.appendChild(statusBtn);
         }
 
-        function removeSyncButton() {
+        function updateSyncButtonsForDisconnectedState() {
             const container = document.getElementById('sync-buttons-container-fixed');
-            if (container) {
-                container.innerHTML = '';
-                container.style.display = 'none';
-            }
-            const existingSyncBtn = document.getElementById('manual-sync-btn');
-            if (existingSyncBtn) {
-                existingSyncBtn.remove();
-            }
+            if (!container) return;
+            
+            // Clear and rebuild for disconnected state
+            container.innerHTML = '';
+            
+            const connectBtn = document.createElement('div');
+            connectBtn.id = 'connect-dropbox-btn';
+            connectBtn.innerHTML = '☁️ Connect to Dropbox';
+            connectBtn.style.cssText = `
+                display: inline-block;
+                padding: 8px 16px;
+                background-color: #3498db;
+                color: white;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+                margin: 0 5px;
+            `;
+            connectBtn.onclick = authenticateDropbox;
+            connectBtn.title = 'Connect to Dropbox for cloud sync';
+            
+            const statusBtn = document.createElement('div');
+            statusBtn.id = 'connection-status-btn';
+            statusBtn.innerHTML = '📱 Local Only';
+            statusBtn.style.cssText = `
+                display: inline-block;
+                padding: 8px 16px;
+                background-color: #95a5a6;
+                color: white;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: default;
+                transition: all 0.3s ease;
+                box-shadow: 0 2px 8px rgba(149, 165, 166, 0.3);
+                margin: 0 5px;
+            `;
+            statusBtn.title = 'Data saved locally only - connect to Dropbox for cloud sync';
+            
+            container.appendChild(connectBtn);
+            container.appendChild(statusBtn);
+        }
+
+        // Keep the old removeSyncButton function for compatibility but make it do nothing
+        function removeSyncButton() {
+            // Do nothing - buttons stay visible always
         }
 
         async function performManualSync() {
