@@ -3262,6 +3262,9 @@
             
             // Set tracking values
             trackingValues = [...habit.trackingValues];
+            
+            // Populate yearly goal data
+            populateYearlyGoalData(habit);
             renderTrackingValueTags();
             updateTrackingValueDropdowns();
             populateContributingValues();
@@ -4725,7 +4728,7 @@
                     warnings.push({
                         type: 'monthly',
                         urgency: urgency,
-                        message: `Need ${remaining} more "${valueKey}" this month`
+                        message: `You've hit ${currentCount} "${valueKey}" - you need ${remaining} more this month`
                     });
                 }
             }
@@ -4887,7 +4890,7 @@
                     habitsWithGoals.forEach(habit => {
                         const goal = habit.yearlyGoal;
                         const progress = getYearlyGoalProgress(habit, goal);
-                        const remaining = Math.max(0, goal.targetCount - progress.achieved);
+                        const remaining = Math.max(0, goal.amount - progress.achieved);
                         
                         // Calculate daily pace needed to meet goal
                         const yearEnd = new Date(currentYear, 11, 31);
@@ -4900,7 +4903,7 @@
                             <div class="goal-header">
                                 <h4 style="color: ${habit.color}">${habit.name}</h4>
                                 <div class="goal-progress">
-                                    <span class="progress-text">${progress.achieved}/${goal.targetCount} ${goal.targetUnit}</span>
+                                    <span class="progress-text">${progress.achieved}/${goal.amount} units</span>
                                     <span class="progress-percentage">${Math.round(progress.percentage)}%</span>
                                 </div>
                             </div>
@@ -4908,9 +4911,9 @@
                                 <div class="progress-fill" style="width: ${Math.min(progress.percentage, 100)}%; background-color: ${habit.color}"></div>
                             </div>
                             <div class="goal-details">
-                                <p><strong>Target:</strong> ${goal.targetCount} ${goal.targetUnit} in ${goal.year}</p>
-                                <p><strong>Goals Left:</strong> ${remaining} ${goal.targetUnit} remaining</p>
-                                <p><strong>Daily pace needed:</strong> ${dailyPaceNeeded} ${goal.targetUnit}/day</p>
+                                <p><strong>Target:</strong> ${goal.amount} units in ${new Date().getFullYear()}</p>
+                                <p><strong>Goals Left:</strong> ${remaining} units remaining</p>
+                                <p><strong>Daily pace needed:</strong> ${dailyPaceNeeded} units/day</p>
                             </div>
                         `;
                         
@@ -4980,7 +4983,7 @@
                 }
             });
             
-            const percentage = goal.targetCount > 0 ? (achieved / goal.targetCount) * 100 : 0;
+            const percentage = goal.amount > 0 ? (achieved / goal.amount) * 100 : 0;
             
             return {
                 achieved: achieved,
