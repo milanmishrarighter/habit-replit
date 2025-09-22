@@ -2290,18 +2290,19 @@
             syncBtn.innerHTML = '🔄 Sync';
             syncBtn.style.cssText = `
                 position: fixed;
-                top: 85px;
+                top: 110px;
                 left: 50%;
-                transform: translateX(-120px);
-                padding: 10px 15px;
+                transform: translateX(-50%);
+                padding: 8px 16px;
                 background-color: #3498db;
                 color: white;
-                border-radius: 25px;
-                font-size: 14px;
-                font-weight: 500;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: 600;
                 z-index: 1000;
                 cursor: pointer;
                 transition: all 0.3s ease;
+                box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
             `;
             syncBtn.onclick = performManualSync;
             syncBtn.title = 'Manually sync all data to Dropbox';
@@ -4494,6 +4495,7 @@
             const rules = getHabitRules(habitId);
             const weekCounts = computeWeekCounts(habitId);
             const monthCounts = computeMonthCounts(habitId);
+            console.log(`calculateWarnings for habit ${habitId}:`, {rules, weekCounts, monthCounts});
             const warnings = [];
             
             // Weekly limit warnings
@@ -4601,6 +4603,12 @@
             if (!possibleContainer) return;
             
             const habits = getHabits();
+            console.log('displayPossibleWarnings - habits:', habits);
+            if (!Array.isArray(habits)) {
+                console.error('getHabits() did not return an array:', habits);
+                return;
+            }
+            
             const allWarnings = [];
             
             habits.forEach(habit => {
