@@ -2057,12 +2057,18 @@
                 statusDiv.style.color = 'white';
                 statusDiv.onclick = disconnectDropbox;
                 statusDiv.title = 'Click to disconnect from Dropbox';
+                
+                // Add sync button when connected
+                createSyncButton();
             } else {
                 statusDiv.innerHTML = '📱 Local Only';
                 statusDiv.style.backgroundColor = '#95a5a6';
                 statusDiv.style.color = 'white';
                 statusDiv.onclick = authenticateDropbox;
                 statusDiv.title = 'Click to connect to Dropbox for cloud sync';
+                
+                // Remove sync button when disconnected
+                removeSyncButton();
             }
         }
 
@@ -2099,6 +2105,91 @@
                 }
                 console.error('Error loading from cloud:', error);
                 return null;
+            }
+        }
+
+        // Sync Button Functions
+        function createSyncButton() {
+            // Remove existing sync button first
+            removeSyncButton();
+            
+            const syncBtn = document.createElement('div');
+            syncBtn.id = 'manual-sync-btn';
+            syncBtn.innerHTML = '🔄 Sync';
+            syncBtn.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 140px;
+                padding: 10px 15px;
+                background-color: #3498db;
+                color: white;
+                border-radius: 25px;
+                font-size: 14px;
+                font-weight: 500;
+                z-index: 1000;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            `;
+            syncBtn.onclick = performManualSync;
+            syncBtn.title = 'Manually sync all data to Dropbox';
+            document.body.appendChild(syncBtn);
+        }
+
+        function removeSyncButton() {
+            const existingSyncBtn = document.getElementById('manual-sync-btn');
+            if (existingSyncBtn) {
+                existingSyncBtn.remove();
+            }
+        }
+
+        async function performManualSync() {
+            const syncBtn = document.getElementById('manual-sync-btn');
+            if (!syncBtn) return;
+            
+            // Show syncing state
+            syncBtn.innerHTML = '⏳ Syncing...';
+            syncBtn.style.backgroundColor = '#f39c12';
+            syncBtn.onclick = null; // Disable during sync
+            
+            try {
+                // Collect all local data
+                const allData = {
+                    journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
+                    habits: JSON.parse(localStorage.getItem('habits') || '[]'),
+                    finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                    dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
+                    lastSync: new Date().toISOString()
+                };
+                
+                // Force sync to cloud
+                const syncSuccess = await syncToCloud(allData);
+                
+                if (syncSuccess) {
+                    syncBtn.innerHTML = '✅ Synced!';
+                    syncBtn.style.backgroundColor = '#27ae60';
+                    showCustomModal('Sync Complete!', 'All your data has been successfully synced to Dropbox! 📊☁️', 'success', null, true);
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        syncBtn.innerHTML = '🔄 Sync';
+                        syncBtn.style.backgroundColor = '#3498db';
+                        syncBtn.onclick = performManualSync;
+                    }, 2000);
+                } else {
+                    throw new Error('Sync failed');
+                }
+            } catch (error) {
+                console.error('Manual sync failed:', error);
+                syncBtn.innerHTML = '❌ Failed';
+                syncBtn.style.backgroundColor = '#e74c3c';
+                showCustomModal('Sync Failed', 'Failed to sync data to Dropbox. Check your connection and try again.', 'error');
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    syncBtn.innerHTML = '🔄 Sync';
+                    syncBtn.style.backgroundColor = '#3498db';
+                    syncBtn.onclick = performManualSync;
+                }, 3000);
             }
         }
 
@@ -2687,7 +2778,7 @@
             } else if (isAuthenticated) {
                 showCustomModal('Warning', `Habit "${habitData.name}" saved locally. Cloud sync failed, but data is safe.`, 'warning');
             } else {
-                showCustomModal('Success', `Habit "${habitData.name}" saved locally! Connect to Google Sheets for cloud sync.`, 'success');
+                showCustomModal('Success', `Habit "${habitData.name}" saved locally! Connect to Dropbox for cloud sync.`, 'success');
             }
         }
 
@@ -2778,14 +2869,25 @@
         }
 
         async function saveHabits(habits) {
-            // Always save to localStorage as backup
-            try {
-                localStorage.setItem('habits', JSON.stringify(habits));
-            } catch (error) {
-                console.error('Error saving habits to localStorage:', error);
-            }
+            // Use the unified cloud sync function
+            await saveDataWithSync('habits', habits);
             
-            // Cloud sync is handled by the new implementation
+            // Check if sync was successful by trying to sync again
+            if (isAuthenticated && dbx) {
+                try {
+                    const allData = {
+                        journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
+                        habits: habits,
+                        finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                        lastSync: new Date().toISOString()
+                    };
+                    const syncSuccess = await syncToCloud(allData);
+                    return syncSuccess;
+                } catch (error) {
+                    console.error('Error syncing habits to cloud:', error);
+                    return false;
+                }
+            }
             return false;
         }
 
