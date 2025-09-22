@@ -1839,64 +1839,8 @@
     </div>
 
     <script>
-        // Dropbox Configuration
-        const DROPBOX_CONFIG = {
-            APP_KEY: 'lxpor7a9x078wwa',
-            FILE_PATH: '/journal.json'
-        };
 
-        // Dropbox API State
-        let dbx = null;
-        let isAuthenticated = false;
 
-        // Initialize Dropbox
-        function initializeDropbox() {
-            // Initialize Dropbox client
-            dbx = new Dropbox.Dropbox({ 
-                clientId: DROPBOX_CONFIG.APP_KEY,
-                fetch: fetch
-            });
-            
-            // Check if user is already authenticated
-            const accessToken = localStorage.getItem('dropboxAccessToken');
-            if (accessToken) {
-                dbx.setAccessToken(accessToken);
-                isAuthenticated = true;
-            }
-            
-            // Add auth button to UI
-            addAuthButton();
-        }
-
-        function addAuthButton() {
-            const dailyEntriesHeader = document.querySelector('#daily-entries h2');
-            if (dailyEntriesHeader && !document.getElementById('dropbox-auth-btn')) {
-                const authContainer = document.createElement('div');
-                authContainer.style.display = 'flex';
-                authContainer.style.alignItems = 'center';
-                authContainer.style.gap = '10px';
-                authContainer.style.marginTop = '10px';
-                
-                const authButton = document.createElement('button');
-                authButton.id = 'dropbox-auth-btn';
-                authButton.textContent = 'Connect to Dropbox';
-                authButton.className = 'save-btn';
-                authButton.onclick = handleAuthClick;
-                
-                const statusText = document.createElement('span');
-                statusText.id = 'connection-status';
-                statusText.style.fontSize = '14px';
-                statusText.style.color = '#666';
-                statusText.textContent = 'Offline mode - data saved locally';
-                
-                authContainer.appendChild(authButton);
-                authContainer.appendChild(statusText);
-                dailyEntriesHeader.appendChild(authContainer);
-                
-                // Update button state
-                updateAuthButton();
-            }
-        }
 
         function updateAuthButton() {
             const authButton = document.getElementById('dropbox-auth-btn');
@@ -2163,8 +2107,6 @@
             // Initialize recent emojis
             initializeRecentEmojis();
             
-            // Initialize Dropbox
-            initializeDropbox();
             
             // Check for OAuth callback
             handleAuthCallback();
