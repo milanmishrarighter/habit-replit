@@ -2217,12 +2217,29 @@
 
         // Initialize Dropbox when DOM is ready
 
-        // Load test data function
+        // Load test data function - fetch from Dropbox integration
         async function loadTestData() {
             try {
-                console.log('Loading test data...');
-                const response = await fetch('./habit-tracker-data.json');
-                const data = await response.json();
+                console.log('Loading test data from Dropbox...');
+                
+                // Try to read from Dropbox first
+                let data;
+                try {
+                    data = await readFromDropbox('habit-tracker-data.json');
+                    console.log('Successfully loaded data from Dropbox');
+                } catch (dropboxError) {
+                    console.log('Failed to load from Dropbox, trying local fallback:', dropboxError);
+                    // Fallback to local file if Dropbox fails
+                    const response = await fetch('./habit-tracker-data.json');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const textContent = await response.text();
+                    if (textContent.startsWith('<!DOCTYPE')) {
+                        throw new Error('Received HTML instead of JSON - file not found');
+                    }
+                    data = JSON.parse(textContent);
+                }
                 
                 console.log('Test data loaded:', data);
                 
@@ -2312,6 +2329,24 @@
         let dropboxAccessToken = localStorage.getItem('dropboxAccessToken');
         let isAuthenticated = !!dropboxAccessToken;
         let dbx = null;
+
+        // Read data from Dropbox
+        async function readFromDropbox(filename) {
+            if (!dbx || !isAuthenticated) {
+                throw new Error('Dropbox not authenticated');
+            }
+            
+            try {
+                console.log(`Reading ${filename} from Dropbox...`);
+                const response = await dbx.filesDownload({path: '/' + filename});
+                const fileContent = await response.result.fileBinary.text();
+                console.log(`Successfully read ${filename} from Dropbox`);
+                return JSON.parse(fileContent);
+            } catch (error) {
+                console.error(`Error reading ${filename} from Dropbox:`, error);
+                throw error;
+            }
+        }
 
         // Initialize Dropbox client if we have a token
         if (isAuthenticated) {
@@ -4220,6 +4255,32 @@
             }
             
             return count;
+        }
+
+        // Get counts for all tracking values for a habit in a specific week
+        function getWeekCounts(habitId, weekStartDateString) {
+            console.log(`=== getWeekCounts for habit ${habitId}, week starting ${weekStartDateString} ===`);
+            const weekStart = new Date(weekStartDateString);
+            const weekEnd = new Date(weekStart.getTime() + (6 * 24 * 60 * 60 * 1000)); // Add 6 days
+            const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+            const counts = {};
+
+            console.log(`Week range: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
+
+            for (const [date, entry] of Object.entries(journalEntries)) {
+                const entryDate = new Date(date);
+                if (entryDate >= weekStart && entryDate <= weekEnd) {
+                    if (entry.habitData && entry.habitData[habitId]) {
+                        const habitEntry = entry.habitData[habitId];
+                        const trackingValue = habitEntry.selectedValue;
+                        counts[trackingValue] = (counts[trackingValue] || 0) + 1;
+                        console.log(`Found ${trackingValue} on ${date} for habit ${habitId}`);
+                    }
+                }
+            }
+
+            console.log(`Week counts for habit ${habitId}:`, counts);
+            return counts;
         }
 
         function renderCommittedFines(fines) {
