@@ -2217,12 +2217,14 @@
 
         // Initialize Dropbox when DOM is ready
 
-        // Load test data function - fetch from Dropbox integration
+        // Load test data function
         async function loadTestData() {
             try {
-                console.log('Loading data from Dropbox...');
-                const data = await readFromDropbox('habit-tracker-data.json');
-                console.log('Successfully loaded data from Dropbox');
+                console.log('Loading test data...');
+                const response = await fetch('./habit-tracker-data.json');
+                const data = await response.json();
+                
+                console.log('Test data loaded:', data);
                 
                 // Load data into localStorage
                 localStorage.setItem('journalEntries', JSON.stringify(data.journalEntries || {}));
@@ -2230,13 +2232,13 @@
                 localStorage.setItem('finesStatus', JSON.stringify(data.finesStatus || []));
                 localStorage.setItem('dailyHabitTracking', JSON.stringify(data.dailyHabitTracking || {}));
                 
-                console.log('Data loaded into localStorage from Dropbox');
+                console.log('Test data loaded into localStorage');
                 
                 // Clear caches so new data is used
                 clearCountsCache();
                 
-                // Test that warnings work with the loaded data
-                console.log('Testing warnings with loaded data...');
+                // Test that warnings work with the new data
+                console.log('Testing warnings with new data...');
                 data.habits.forEach(habit => {
                     const warnings = calculateWarnings(habit.id);
                     console.log(`Warnings for ${habit.name} (${habit.id}):`, warnings);
@@ -2244,16 +2246,7 @@
                 
                 return true;
             } catch (error) {
-                console.error('Failed to load data from Dropbox:', error);
-                console.log('No fallback - app requires Dropbox authentication to access data');
-                
-                // Clear any existing local data to prevent stale data usage
-                localStorage.removeItem('journalEntries');
-                localStorage.removeItem('habits');
-                localStorage.removeItem('finesStatus');
-                localStorage.removeItem('dailyHabitTracking');
-                
-                console.log('Local storage cleared - connect to Dropbox to access your data');
+                console.error('Error loading test data:', error);
                 return false;
             }
         }
@@ -2320,24 +2313,6 @@
         let isAuthenticated = !!dropboxAccessToken;
         let dbx = null;
 
-        // Read data from Dropbox
-        async function readFromDropbox(filename) {
-            if (!dbx || !isAuthenticated) {
-                throw new Error('Dropbox not authenticated');
-            }
-            
-            try {
-                console.log(`Reading ${filename} from Dropbox...`);
-                const response = await dbx.filesDownload({path: '/' + filename});
-                const fileContent = await response.result.fileBinary.text();
-                console.log(`Successfully read ${filename} from Dropbox`);
-                return JSON.parse(fileContent);
-            } catch (error) {
-                console.error(`Error reading ${filename} from Dropbox:`, error);
-                throw error;
-            }
-        }
-
         // Initialize Dropbox client if we have a token
         if (isAuthenticated) {
             dbx = new Dropbox.Dropbox({ accessToken: dropboxAccessToken });
@@ -2382,20 +2357,14 @@
 
         function updateAuthStatus() {
             // Status is now handled by the pinned sync buttons container
-            // Keep buttons always visible, just change their states
-            
-            const container = document.getElementById('sync-buttons-container-fixed');
-            if (!container) return;
-            
-            // Always show the container
-            container.style.display = 'block';
+            // No need for floating status div anymore
             
             if (isAuthenticated) {
-                // Show connected state
-                updateSyncButtonsForConnectedState();
+                // Add sync button when connected
+                createSyncButton();
             } else {
-                // Show disconnected state - but keep buttons visible
-                updateSyncButtonsForDisconnectedState();
+                // Remove sync button when disconnected
+                removeSyncButton();
             }
         }
 
@@ -2436,17 +2405,15 @@
         }
 
         // Sync Button Functions
-        // Keep createSyncButton for compatibility but redirect to connected state
         function createSyncButton() {
-            updateSyncButtonsForConnectedState();
-        }
-
-        function updateSyncButtonsForConnectedState() {
+            // Remove existing sync button first
+            removeSyncButton();
+            
             const container = document.getElementById('sync-buttons-container-fixed');
             if (!container) return;
             
-            // Clear and rebuild for connected state
-            container.innerHTML = '';
+            // Show the container
+            container.style.display = 'block';
             
             const syncBtn = document.createElement('div');
             syncBtn.id = 'manual-sync-btn';
@@ -2490,57 +2457,16 @@
             container.appendChild(statusBtn);
         }
 
-        function updateSyncButtonsForDisconnectedState() {
-            const container = document.getElementById('sync-buttons-container-fixed');
-            if (!container) return;
-            
-            // Clear and rebuild for disconnected state
-            container.innerHTML = '';
-            
-            const connectBtn = document.createElement('div');
-            connectBtn.id = 'connect-dropbox-btn';
-            connectBtn.innerHTML = '☁️ Connect to Dropbox';
-            connectBtn.style.cssText = `
-                display: inline-block;
-                padding: 8px 16px;
-                background-color: #3498db;
-                color: white;
-                border-radius: 20px;
-                font-size: 12px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
-                margin: 0 5px;
-            `;
-            connectBtn.onclick = authenticateDropbox;
-            connectBtn.title = 'Connect to Dropbox for cloud sync';
-            
-            const statusBtn = document.createElement('div');
-            statusBtn.id = 'connection-status-btn';
-            statusBtn.innerHTML = '📱 Local Only';
-            statusBtn.style.cssText = `
-                display: inline-block;
-                padding: 8px 16px;
-                background-color: #95a5a6;
-                color: white;
-                border-radius: 20px;
-                font-size: 12px;
-                font-weight: 600;
-                cursor: default;
-                transition: all 0.3s ease;
-                box-shadow: 0 2px 8px rgba(149, 165, 166, 0.3);
-                margin: 0 5px;
-            `;
-            statusBtn.title = 'Data saved locally only - connect to Dropbox for cloud sync';
-            
-            container.appendChild(connectBtn);
-            container.appendChild(statusBtn);
-        }
-
-        // Keep the old removeSyncButton function for compatibility but make it do nothing
         function removeSyncButton() {
-            // Do nothing - buttons stay visible always
+            const container = document.getElementById('sync-buttons-container-fixed');
+            if (container) {
+                container.innerHTML = '';
+                container.style.display = 'none';
+            }
+            const existingSyncBtn = document.getElementById('manual-sync-btn');
+            if (existingSyncBtn) {
+                existingSyncBtn.remove();
+            }
         }
 
         async function performManualSync() {
@@ -4294,32 +4220,6 @@
             }
             
             return count;
-        }
-
-        // Get counts for all tracking values for a habit in a specific week
-        function getWeekCounts(habitId, weekStartDateString) {
-            console.log(`=== getWeekCounts for habit ${habitId}, week starting ${weekStartDateString} ===`);
-            const weekStart = new Date(weekStartDateString);
-            const weekEnd = new Date(weekStart.getTime() + (6 * 24 * 60 * 60 * 1000)); // Add 6 days
-            const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
-            const counts = {};
-
-            console.log(`Week range: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
-
-            for (const [date, entry] of Object.entries(journalEntries)) {
-                const entryDate = new Date(date);
-                if (entryDate >= weekStart && entryDate <= weekEnd) {
-                    if (entry.habitData && entry.habitData[habitId]) {
-                        const habitEntry = entry.habitData[habitId];
-                        const trackingValue = habitEntry.selectedValue;
-                        counts[trackingValue] = (counts[trackingValue] || 0) + 1;
-                        console.log(`Found ${trackingValue} on ${date} for habit ${habitId}`);
-                    }
-                }
-            }
-
-            console.log(`Week counts for habit ${habitId}:`, counts);
-            return counts;
         }
 
         function renderCommittedFines(fines) {
