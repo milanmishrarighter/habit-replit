@@ -1180,6 +1180,29 @@
             margin: 0;
         }
 
+        /* Entry actions and delete button styles */
+        .entry-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .delete-entry-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .delete-entry-btn:hover {
+            background: #c0392b;
+            transform: scale(1.1);
+        }
+
         /* Yearly Goal Styles */
         .yearly-goal-section {
             background: #f8f9fa;
@@ -3741,7 +3764,10 @@
                 entryCard.innerHTML = `
                     <div class="entry-header">
                         <div class="entry-date">${formattedDate}</div>
-                        ${entry.emoji ? `<div class="entry-emoji">${entry.emoji}</div>` : ''}
+                        <div class="entry-actions">
+                            ${entry.emoji ? `<div class="entry-emoji">${entry.emoji}</div>` : ''}
+                            <button class="delete-entry-btn" onclick="deleteEntry('${entry.date}')" title="Delete this entry">🗑️</button>
+                        </div>
                     </div>
                     <div class="entry-text">${entry.text || 'No journal text'}</div>
                     ${hasHabits ? renderEntryHabits(entry.habitData, entry.date) : ''}
@@ -3808,6 +3834,40 @@
                 return habits ? JSON.parse(habits) : [];
             } catch (error) {
                 return [];
+            }
+        }
+
+        // Delete entry function
+        async function deleteEntry(dateString) {
+            if (!confirm(`Are you sure you want to delete the entry for ${formatDateForDisplay(dateString)}? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                // Remove from localStorage
+                const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+                delete journalEntries[dateString];
+                localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
+
+                // Sync to cloud if connected
+                if (isAuthenticated && dbx) {
+                    const allData = {
+                        journalEntries: journalEntries,
+                        habits: JSON.parse(localStorage.getItem('habits') || '[]'),
+                        finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                        dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
+                        lastSync: new Date().toISOString()
+                    };
+                    await syncToCloud(allData);
+                }
+
+                // Refresh the entries display
+                await showAllEntries();
+                
+                showCustomModal('Success', `Entry for ${formatDateForDisplay(dateString)} has been deleted successfully!`, 'success');
+            } catch (error) {
+                console.error('Error deleting entry:', error);
+                showCustomModal('Error', 'Failed to delete entry. Please try again.', 'error');
             }
         }
 
@@ -4530,7 +4590,7 @@
                         fine: { 
                             perOver: habit.fineAmount || 0, 
                             perUnder: habit.fineAmount || 0, 
-                            currency: '$' 
+                            currency: '₹' 
                         }
                     };
                     
@@ -4577,11 +4637,11 @@
                 return rules[habitId] || {
                     weeklyLimits: {},
                     monthlyMinimums: {},
-                    fine: { perOver: 0, perUnder: 0, currency: '$' }
+                    fine: { perOver: 0, perUnder: 0, currency: '₹' }
                 };
             } catch (error) {
                 console.error('Error loading habit rules:', error);
-                return { weeklyLimits: {}, monthlyMinimums: {}, fine: { perOver: 0, perUnder: 0, currency: '$' } };
+                return { weeklyLimits: {}, monthlyMinimums: {}, fine: { perOver: 0, perUnder: 0, currency: '₹' } };
             }
         }
         
@@ -4625,7 +4685,7 @@
             console.log(`calculateWarnings for habit ${habitId}:`, {rules, weekCounts, monthCounts});
             const warnings = [];
             
-            // Weekly limit warnings
+            // Weekly limit warnings (positive messaging)
             for (const [valueKey, maxCount] of Object.entries(rules.weeklyLimits)) {
                 const currentCount = weekCounts[valueKey] || 0;
                 const remaining = maxCount - currentCount;
@@ -4634,19 +4694,19 @@
                     warnings.push({
                         type: 'weekly',
                         urgency: remaining <= 1 ? 'high' : remaining <= 2 ? 'medium' : 'low',
-                        message: `${remaining} more "${valueKey}" left this week`
+                        message: `✅ Great! You can still avoid ${remaining} more "${valueKey}" this week`
                     });
                 } else if (remaining === 0) {
                     warnings.push({
                         type: 'weekly',
                         urgency: 'high',
-                        message: `"${valueKey}" limit reached this week`
+                        message: `⚠️ "${valueKey}" limit reached - be careful this week!`
                     });
                 } else {
                     warnings.push({
                         type: 'weekly',
                         urgency: 'critical',
-                        message: `Over "${valueKey}" limit by ${-remaining}; fines accruing!`
+                        message: `❌ You've exceeded your "${valueKey}" limit this week - ₹500 fine applies`
                     });
                 }
             }
@@ -4809,21 +4869,188 @@
                 yearProgressElement.textContent = `${progressPercentage}%`;
             }
             
-            // Temporary implementation for goals and streaks
+            // Load yearly goals progress
+            const habits = getHabitsSync();
             const goalsContainer = document.getElementById('yearly-goals-list');
-            const streaksContainer = document.getElementById('weekly-streaks-list');
             const noGoalsMsg = document.getElementById('no-yearly-goals');
+            const habitsWithGoals = habits.filter(habit => habit.yearlyGoal);
+            
+            if (goalsContainer && noGoalsMsg) {
+                if (habitsWithGoals.length === 0) {
+                    goalsContainer.style.display = 'none';
+                    noGoalsMsg.style.display = 'block';
+                } else {
+                    noGoalsMsg.style.display = 'none';
+                    goalsContainer.style.display = 'block';
+                    goalsContainer.innerHTML = '';
+                    
+                    habitsWithGoals.forEach(habit => {
+                        const goal = habit.yearlyGoal;
+                        const progress = getYearlyGoalProgress(habit, goal);
+                        const remaining = Math.max(0, goal.targetCount - progress.achieved);
+                        
+                        // Calculate daily pace needed to meet goal
+                        const yearEnd = new Date(currentYear, 11, 31);
+                        const daysRemaining = Math.ceil((yearEnd - today) / (24 * 60 * 60 * 1000));
+                        const dailyPaceNeeded = daysRemaining > 0 ? (remaining / daysRemaining).toFixed(2) : 0;
+                        
+                        const goalItem = document.createElement('div');
+                        goalItem.className = 'goal-item';
+                        goalItem.innerHTML = `
+                            <div class="goal-header">
+                                <h4 style="color: ${habit.color}">${habit.name}</h4>
+                                <div class="goal-progress">
+                                    <span class="progress-text">${progress.achieved}/${goal.targetCount} ${goal.targetUnit}</span>
+                                    <span class="progress-percentage">${Math.round(progress.percentage)}%</span>
+                                </div>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${Math.min(progress.percentage, 100)}%; background-color: ${habit.color}"></div>
+                            </div>
+                            <div class="goal-details">
+                                <p><strong>Target:</strong> ${goal.targetCount} ${goal.targetUnit} in ${goal.year}</p>
+                                <p><strong>Goals Left:</strong> ${remaining} ${goal.targetUnit} remaining</p>
+                                <p><strong>Daily pace needed:</strong> ${dailyPaceNeeded} ${goal.targetUnit}/day</p>
+                            </div>
+                        `;
+                        
+                        goalsContainer.appendChild(goalItem);
+                    });
+                }
+            }
+            
+            // Load weekly streaks with proper formula calculation
+            const streaksContainer = document.getElementById('weekly-streaks-list');
             const noStreaksMsg = document.getElementById('no-weekly-streaks');
             
-            if (goalsContainer) {
-                goalsContainer.innerHTML = '<p>Yearly goals calculation temporarily unavailable. Implementation in progress.</p>';
-                noGoalsMsg.style.display = 'none';
+            if (streaksContainer && noStreaksMsg) {
+                const weeklyStreakData = calculateWeeklyStreaks(habits);
+                
+                if (weeklyStreakData.length === 0) {
+                    streaksContainer.style.display = 'none';
+                    noStreaksMsg.style.display = 'block';
+                } else {
+                    noStreaksMsg.style.display = 'none';
+                    streaksContainer.style.display = 'block';
+                    streaksContainer.innerHTML = '';
+                    
+                    weeklyStreakData.forEach(streak => {
+                        const streakItem = document.createElement('div');
+                        streakItem.className = 'streak-item';
+                        streakItem.innerHTML = `
+                            <div class="streak-header">
+                                <h4 style="color: ${streak.color}">${streak.name}</h4>
+                                <div class="streak-count">
+                                    <span class="streak-number">${streak.currentStreak}</span>
+                                    <span class="streak-label">weeks</span>
+                                </div>
+                            </div>
+                            <div class="streak-details">
+                                <p><strong>Current streak:</strong> ${streak.currentStreak} consecutive weeks</p>
+                                <p><strong>Best streak:</strong> ${streak.bestStreak} weeks</p>
+                                <p><strong>Success rate:</strong> ${streak.successRate}%</p>
+                            </div>
+                        `;
+                        
+                        streaksContainer.appendChild(streakItem);
+                    });
+                }
             }
+        }
+
+        // Get yearly goal progress for a habit
+        function getYearlyGoalProgress(habit, goal) {
+            if (!habit || !goal) return { achieved: 0, percentage: 0 };
             
-            if (streaksContainer) {
-                streaksContainer.innerHTML = '<p>Weekly streaks calculation temporarily unavailable. Implementation in progress.</p>';
-                noStreaksMsg.style.display = 'none';
-            }
+            const currentYear = new Date().getFullYear();
+            const dailyTracking = JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}');
+            
+            let achieved = 0;
+            
+            // Count all instances where contributingValues were tracked this year
+            Object.entries(dailyTracking).forEach(([date, dayData]) => {
+                const entryYear = new Date(date).getFullYear();
+                if (entryYear === currentYear && dayData[habit.id]) {
+                    const habitData = dayData[habit.id];
+                    goal.contributingValues.forEach(value => {
+                        if (habitData[value]) {
+                            achieved++;
+                        }
+                    });
+                }
+            });
+            
+            const percentage = goal.targetCount > 0 ? (achieved / goal.targetCount) * 100 : 0;
+            
+            return {
+                achieved: achieved,
+                percentage: percentage
+            };
+        }
+
+        // Calculate weekly streaks for habits
+        function calculateWeeklyStreaks(habits) {
+            const streakData = [];
+            const dailyTracking = JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}');
+            
+            habits.forEach(habit => {
+                if (habit.frequency !== 'weekly') return;
+                
+                // Get weekly data for this habit (last 12 weeks)
+                const weeklyData = [];
+                const today = new Date();
+                
+                for (let i = 0; i < 12; i++) {
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - (today.getDay() + 7 * i));
+                    const weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekStart.getDate() + 6);
+                    
+                    const weekKey = formatDate(weekStart);
+                    const weekCount = computeWeekCounts(habit.id)[weekKey] || 0;
+                    const isSuccessful = weekCount >= habit.trackingAmount;
+                    
+                    weeklyData.unshift({ weekStart, weekEnd, count: weekCount, successful: isSuccessful });
+                }
+                
+                // Calculate current streak (from most recent week backwards)
+                let currentStreak = 0;
+                for (let i = weeklyData.length - 1; i >= 0; i--) {
+                    if (weeklyData[i].successful) {
+                        currentStreak++;
+                    } else {
+                        break;
+                    }
+                }
+                
+                // Calculate best streak
+                let bestStreak = 0;
+                let tempStreak = 0;
+                weeklyData.forEach(week => {
+                    if (week.successful) {
+                        tempStreak++;
+                        bestStreak = Math.max(bestStreak, tempStreak);
+                    } else {
+                        tempStreak = 0;
+                    }
+                });
+                
+                // Calculate success rate
+                const successfulWeeks = weeklyData.filter(week => week.successful).length;
+                const successRate = weeklyData.length > 0 ? Math.round((successfulWeeks / weeklyData.length) * 100) : 0;
+                
+                streakData.push({
+                    id: habit.id,
+                    name: habit.name,
+                    color: habit.color,
+                    currentStreak: currentStreak,
+                    bestStreak: bestStreak,
+                    successRate: successRate,
+                    weeklyData: weeklyData
+                });
+            });
+            
+            return streakData;
         }
         
         // Function to update live counters and warnings for a specific habit
