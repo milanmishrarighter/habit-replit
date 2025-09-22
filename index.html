@@ -2230,15 +2230,28 @@
                 } catch (dropboxError) {
                     console.log('Failed to load from Dropbox, trying local fallback:', dropboxError);
                     // Fallback to local file if Dropbox fails
-                    const response = await fetch('./habit-tracker-data.json');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                    try {
+                        const response = await fetch('./habit-tracker-data.json');
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const textContent = await response.text();
+                        if (textContent.startsWith('<!DOCTYPE')) {
+                            throw new Error('Received HTML instead of JSON - file not found');
+                        }
+                        data = JSON.parse(textContent);
+                        console.log('Successfully loaded data from local file');
+                    } catch (localError) {
+                        console.log('Local file also failed, using fallback test data:', localError);
+                        // Use inline test data as final fallback
+                        data = {
+                            journalEntries: {},
+                            habits: [],
+                            finesStatus: [],
+                            dailyHabitTracking: {}
+                        };
+                        console.log('Using empty fallback data structure');
                     }
-                    const textContent = await response.text();
-                    if (textContent.startsWith('<!DOCTYPE')) {
-                        throw new Error('Received HTML instead of JSON - file not found');
-                    }
-                    data = JSON.parse(textContent);
                 }
                 
                 console.log('Test data loaded:', data);
@@ -2339,7 +2352,8 @@
             try {
                 console.log(`Reading ${filename} from Dropbox...`);
                 const response = await dbx.filesDownload({path: '/' + filename});
-                const fileContent = await response.result.fileBinary.text();
+                // Correct way to get file content from Dropbox API
+                const fileContent = new TextDecoder().decode(response.result.fileBinary);
                 console.log(`Successfully read ${filename} from Dropbox`);
                 return JSON.parse(fileContent);
             } catch (error) {
