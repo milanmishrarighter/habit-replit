@@ -2098,39 +2098,6 @@
 
         // Initialize Dropbox when DOM is ready
 
-        // Load test data function
-        async function loadTestData() {
-            try {
-                console.log('Loading test data...');
-                const response = await fetch('./habit-tracker-data.json');
-                const data = await response.json();
-                
-                console.log('Test data loaded:', data);
-                
-                // Load data into localStorage
-                localStorage.setItem('journalEntries', JSON.stringify(data.journalEntries || {}));
-                localStorage.setItem('habits', JSON.stringify(data.habits || []));
-                localStorage.setItem('finesStatus', JSON.stringify(data.finesStatus || []));
-                localStorage.setItem('dailyHabitTracking', JSON.stringify(data.dailyHabitTracking || {}));
-                
-                console.log('Test data loaded into localStorage');
-                
-                // Clear caches so new data is used
-                clearCountsCache();
-                
-                // Test that warnings work with the new data
-                console.log('Testing warnings with new data...');
-                data.habits.forEach(habit => {
-                    const warnings = calculateWarnings(habit.id);
-                    console.log(`Warnings for ${habit.name} (${habit.id}):`, warnings);
-                });
-                
-                return true;
-            } catch (error) {
-                console.error('Error loading test data:', error);
-                return false;
-            }
-        }
 
         // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', async function() {
@@ -2219,6 +2186,11 @@
                     updateAuthStatus();
                 }
             }
+        }
+
+        function connectToDropbox() {
+            const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=token&redirect_uri=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+            window.location.href = authUrl;
         }
 
         function disconnectDropbox() {
@@ -2335,12 +2307,9 @@
         function removeSyncButton() {
             const container = document.getElementById('sync-buttons-container-fixed');
             if (container) {
-                container.innerHTML = '';
-                container.style.display = 'none';
-            }
-            const existingSyncBtn = document.getElementById('manual-sync-btn');
-            if (existingSyncBtn) {
-                existingSyncBtn.remove();
+                // Instead of hiding completely, show "Connect to Dropbox" button
+                container.innerHTML = '<div style="display: inline-block; padding: 8px 16px; background-color: #e74c3c; color: white; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; margin: 0 5px; box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);" onclick="connectToDropbox()" title="Click to connect to Dropbox">☁️ Connect Dropbox</div>';
+                container.style.display = 'block';
             }
         }
 
@@ -2469,6 +2438,11 @@
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             handleDropboxAuth();
+            // Always show sync button container and determine proper state
+            const container = document.getElementById('sync-buttons-container-fixed');
+            if (container) {
+                container.style.display = 'block';
+            }
             updateAuthStatus();
         });
 
