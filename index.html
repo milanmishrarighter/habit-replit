@@ -2231,43 +2231,13 @@
         }
 
         function updateAuthStatus() {
-            // Add cloud sync status indicator to the page
-            let statusDiv = document.getElementById('cloud-status');
-            if (!statusDiv) {
-                statusDiv = document.createElement('div');
-                statusDiv.id = 'cloud-status';
-                statusDiv.style.cssText = `
-                    position: fixed;
-                    top: 85px;
-                    left: 50%;
-                    transform: translateX(42px);
-                    padding: 10px 15px;
-                    border-radius: 25px;
-                    font-size: 14px;
-                    font-weight: 500;
-                    z-index: 1000;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                `;
-                document.body.appendChild(statusDiv);
-            }
+            // Status is now handled by the pinned sync buttons container
+            // No need for floating status div anymore
             
             if (isAuthenticated) {
-                statusDiv.innerHTML = '☁️ Connected';
-                statusDiv.style.backgroundColor = '#27ae60';
-                statusDiv.style.color = 'white';
-                statusDiv.onclick = disconnectDropbox;
-                statusDiv.title = 'Click to disconnect from Dropbox';
-                
                 // Add sync button when connected
                 createSyncButton();
             } else {
-                statusDiv.innerHTML = '📱 Local Only';
-                statusDiv.style.backgroundColor = '#95a5a6';
-                statusDiv.style.color = 'white';
-                statusDiv.onclick = authenticateDropbox;
-                statusDiv.title = 'Click to connect to Dropbox for cloud sync';
-                
                 // Remove sync button when disconnected
                 removeSyncButton();
             }
@@ -4525,20 +4495,34 @@
                     // Convert frequencies to rules format
                     habit.frequencies.forEach(freq => {
                         console.log(`Processing frequency:`, freq);
+                        console.log(`Rules before processing:`, JSON.stringify(rules));
                         if (freq.frequency === 'weekly') {
                             // For negative tracking values (like "no"), these are limits (max allowed)
                             if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed') {
+                                if (!rules.weeklyLimits) {
+                                    console.error(`weeklyLimits is undefined! Full rules:`, rules);
+                                    rules.weeklyLimits = {};
+                                }
                                 rules.weeklyLimits[freq.trackingValue] = freq.number;
                                 console.log(`Added weekly limit: ${freq.trackingValue} = ${freq.number}`);
                             } else {
                                 // For positive tracking values, these are minimums (required)
+                                if (!rules.weeklyMinimums) {
+                                    console.error(`weeklyMinimums is undefined! Full rules:`, rules);
+                                    rules.weeklyMinimums = {};
+                                }
                                 rules.weeklyMinimums[freq.trackingValue] = freq.number;
                                 console.log(`Added weekly minimum: ${freq.trackingValue} = ${freq.number}`);
                             }
                         } else if (freq.frequency === 'monthly') {
+                            if (!rules.monthlyMinimums) {
+                                console.error(`monthlyMinimums is undefined! Full rules:`, rules);
+                                rules.monthlyMinimums = {};
+                            }
                             rules.monthlyMinimums[freq.trackingValue] = freq.number;
                             console.log(`Added monthly minimum: ${freq.trackingValue} = ${freq.number}`);
                         }
+                        console.log(`Rules after processing:`, JSON.stringify(rules));
                     });
                     
                     console.log(`Converted rules for habit ${habitId}:`, rules);
@@ -4670,7 +4654,7 @@
             if (noCommittedMsg) noCommittedMsg.style.display = 'none';
             
             const finesHtml = fines.map(fine => {
-                const habit = getHabits().find(h => h.id === fine.habitId);
+                const habit = getHabitsSync().find(h => h.id === fine.habitId);
                 const habitName = habit ? habit.name : 'Unknown Habit';
                 
                 return `
@@ -4703,10 +4687,10 @@
             
             if (!possibleContainer) return;
             
-            const habits = getHabits();
+            const habits = getHabitsSync();
             console.log('displayPossibleWarnings - habits:', habits);
             if (!Array.isArray(habits)) {
-                console.error('getHabits() did not return an array:', habits);
+                console.error('getHabitsSync() did not return an array:', habits);
                 return;
             }
             
@@ -4850,7 +4834,7 @@
         
         // Function to update all live counters
         function updateLiveCounters() {
-            const habits = getHabits();
+            const habits = getHabitsSync();
             habits.forEach(habit => {
                 updateHabitCountersAndWarnings(habit.id);
             });
