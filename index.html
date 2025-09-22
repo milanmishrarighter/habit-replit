@@ -1380,6 +1380,36 @@
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
+                margin-top: 80px; /* Add space for status buttons */
+            }
+
+            /* Mobile-friendly status buttons */
+            #cloud-status {
+                position: fixed !important;
+                top: 10px !important;
+                right: 10px !important;
+                font-size: 12px !important;
+                padding: 6px 10px !important;
+                z-index: 1001 !important;
+                max-width: calc(45vw - 15px) !important;
+                text-align: center !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            #manual-sync-btn {
+                position: fixed !important;
+                top: 10px !important;
+                right: calc(45vw + 15px) !important;
+                font-size: 12px !important;
+                padding: 6px 10px !important;
+                z-index: 1000 !important;
+                max-width: calc(35vw - 15px) !important;
+                text-align: center !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
             }
 
             h1 {
@@ -2193,25 +2223,75 @@
             }
         }
 
-        // Enhanced save functions that include cloud sync
-        async function saveDataWithSync(key, data) {
-            // Always save to localStorage as backup
-            localStorage.setItem(key, JSON.stringify(data));
+        // Live sync functionality - automatically syncs all data changes
+        async function triggerLiveSync(changeType = 'data_change', showNotification = false) {
+            if (!isAuthenticated || !dbx) return false;
             
-            // Try to sync to cloud if authenticated
-            if (isAuthenticated) {
+            try {
                 const allData = {
                     journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
                     habits: JSON.parse(localStorage.getItem('habits') || '[]'),
                     finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                    dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
                     lastSync: new Date().toISOString()
                 };
                 
                 const syncSuccess = await syncToCloud(allData);
                 if (syncSuccess) {
-                    console.log('Data synced to cloud successfully');
+                    console.log(`Live sync successful: ${changeType}`);
+                    updateSyncIndicator('success');
+                    
+                    if (showNotification) {
+                        showCustomModal('Synced!', `${changeType} synced to Dropbox! ☁️`, 'success', null, true);
+                    }
+                    return true;
+                } else {
+                    console.warn(`Live sync failed: ${changeType}`);
+                    updateSyncIndicator('error');
+                    return false;
                 }
+            } catch (error) {
+                console.error('Live sync error:', error);
+                updateSyncIndicator('error');
+                return false;
             }
+        }
+
+        // Update sync indicator to show live sync status
+        function updateSyncIndicator(status) {
+            const statusDiv = document.getElementById('cloud-status');
+            if (!statusDiv || !isAuthenticated) return;
+            
+            const originalBg = statusDiv.style.backgroundColor;
+            
+            if (status === 'success') {
+                statusDiv.style.backgroundColor = '#27ae60';
+                statusDiv.innerHTML = '☁️ Synced';
+                
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    statusDiv.innerHTML = '☁️ Connected';
+                    statusDiv.style.backgroundColor = originalBg;
+                }, 2000);
+            } else if (status === 'error') {
+                statusDiv.style.backgroundColor = '#e74c3c';
+                statusDiv.innerHTML = '☁️ Sync Failed';
+                
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    statusDiv.innerHTML = '☁️ Connected';
+                    statusDiv.style.backgroundColor = originalBg;
+                }, 3000);
+            }
+        }
+
+        // Enhanced save functions that include live sync
+        async function saveDataWithSync(key, data) {
+            // Always save to localStorage as backup
+            localStorage.setItem(key, JSON.stringify(data));
+            
+            // Trigger live sync immediately
+            await triggerLiveSync(`${key} saved`);
         }
 
         // Initialize on page load
@@ -3227,7 +3307,7 @@
             });
         }
 
-        function selectTrackingValue(habitId, value) {
+        async function selectTrackingValue(habitId, value) {
             const today = getCurrentDate();
             
             // Update UI
@@ -3243,10 +3323,10 @@
             });
 
             // Save data
-            saveDailyHabitData(today, habitId, value, null);
+            await saveDailyHabitData(today, habitId, value, null);
         }
 
-        function toggleOutOfControl(habitId) {
+        async function toggleOutOfControl(habitId) {
             const today = getCurrentDate();
             const existingData = getDailyHabitData(today, habitId);
             const newOutOfControlState = !existingData.outOfControlMiss;
@@ -3260,7 +3340,7 @@
             }
 
             // Save data
-            saveDailyHabitData(today, habitId, existingData.selectedValue, newOutOfControlState);
+            await saveDailyHabitData(today, habitId, existingData.selectedValue, newOutOfControlState);
         }
 
         function getCurrentDate() {
@@ -3279,7 +3359,7 @@
             }
         }
 
-        function saveDailyHabitData(date, habitId, selectedValue, outOfControlMiss) {
+        async function saveDailyHabitData(date, habitId, selectedValue, outOfControlMiss) {
             try {
                 const data = localStorage.getItem('dailyHabitTracking');
                 const allData = data ? JSON.parse(data) : {};
@@ -3301,6 +3381,9 @@
                 }
 
                 localStorage.setItem('dailyHabitTracking', JSON.stringify(allData));
+                
+                // Trigger live sync for daily habit tracking
+                await triggerLiveSync('Daily habit tracking updated');
             } catch (error) {
                 console.error('Error saving daily habit data:', error);
             }
