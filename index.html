@@ -1873,8 +1873,12 @@
                 const checkClosed = setInterval(() => {
                     if (popup.closed) {
                         clearInterval(checkClosed);
-                        // Check if we got a token from URL params
-                        handleAuthCallback();
+                        // Check if authentication was successful
+                        const hash = window.location.hash;
+                        if (hash && hash.includes('access_token')) {
+                            // Handle successful authentication through the new system
+                            handleDropboxAuth();
+                        }
                     }
                 }, 1000);
             } catch (error) {
@@ -1882,23 +1886,6 @@
             }
         }
 
-        function handleAuthCallback() {
-            // Check for access token in URL
-            const urlParams = new URLSearchParams(window.location.hash.substring(1));
-            const accessToken = urlParams.get('access_token');
-            
-            if (accessToken) {
-                // Save token and authenticate
-                localStorage.setItem('dropboxAccessToken', accessToken);
-                dbx.setAccessToken(accessToken);
-                isAuthenticated = true;
-                updateAuthButton();
-                showCustomModal('Success', 'Connected to Dropbox successfully!', 'success');
-                
-                // Clean up URL
-                window.location.hash = '';
-            }
-        }
 
 
 
@@ -1917,8 +1904,8 @@
             initializeRecentEmojis();
             
             
-            // Check for OAuth callback
-            handleAuthCallback();
+            // Initialize Dropbox authentication
+            handleDropboxAuth();
         });
 
         // Tab switching functionality
@@ -2525,7 +2512,7 @@
             const errorElement = document.getElementById('habit-name-error');
             
             // Check if habit name is unique
-            const existingHabits = getHabits();
+            const existingHabits = getHabitsSync();
             const isDuplicate = existingHabits.some(habit => 
                 habit.name.toLowerCase() === habitName.toLowerCase() && 
                 (editingHabitId === null || habit.id !== editingHabitId)
