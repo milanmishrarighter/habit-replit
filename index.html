@@ -1538,20 +1538,6 @@
                 text-overflow: ellipsis !important;
             }
 
-            #manual-sync-btn {
-                position: fixed !important;
-                top: 80px !important;
-                left: 50% !important;
-                transform: translateX(-80px) !important;
-                font-size: 12px !important;
-                padding: 6px 10px !important;
-                z-index: 1000 !important;
-                max-width: calc(35vw - 15px) !important;
-                text-align: center !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                text-overflow: ellipsis !important;
-            }
 
             h1 {
                 font-size: 2rem;
@@ -1610,6 +1596,12 @@
             <button class="tab-button" onclick="openTab(event, 'fines')">Fines</button>
             <button class="tab-button" onclick="openTab(event, 'habit-setup')">Habit Setup</button>
             <button class="tab-button" onclick="openTab(event, 'yearly-analytics')">Yearly Analytics</button>
+        </div>
+
+        <!-- Sync Buttons Container - Pinned between tabs and content -->
+        <div id="sync-buttons-container-fixed" style="text-align: center; padding: 15px 0; background: rgba(255,255,255,0.95); border-bottom: 1px solid #e1e8ed;">
+            <div id="manual-sync-btn" style="display: inline-block; padding: 8px 16px; background-color: #3498db; color: white; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; margin: 0 5px; box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);" onclick="performManualSync()" title="Manually sync all data to Dropbox">🔄 Sync</div>
+            <div id="connection-status-btn" style="display: inline-block; padding: 8px 16px; background-color: #27ae60; color: white; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; margin: 0 5px; box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);" onclick="disconnectDropbox()" title="Click to disconnect from Dropbox">☁️ Connected</div>
         </div>
 
         <!-- Tab Content -->
@@ -2106,8 +2098,45 @@
 
         // Initialize Dropbox when DOM is ready
 
+        // Load test data function
+        async function loadTestData() {
+            try {
+                console.log('Loading test data...');
+                const response = await fetch('./habit-tracker-data.json');
+                const data = await response.json();
+                
+                console.log('Test data loaded:', data);
+                
+                // Load data into localStorage
+                localStorage.setItem('journalEntries', JSON.stringify(data.journalEntries || {}));
+                localStorage.setItem('habits', JSON.stringify(data.habits || []));
+                localStorage.setItem('finesStatus', JSON.stringify(data.finesStatus || []));
+                localStorage.setItem('dailyHabitTracking', JSON.stringify(data.dailyHabitTracking || {}));
+                
+                console.log('Test data loaded into localStorage');
+                
+                // Clear caches so new data is used
+                clearCountsCache();
+                
+                // Test that warnings work with the new data
+                console.log('Testing warnings with new data...');
+                data.habits.forEach(habit => {
+                    const warnings = calculateWarnings(habit.id);
+                    console.log(`Warnings for ${habit.name} (${habit.id}):`, warnings);
+                });
+                
+                return true;
+            } catch (error) {
+                console.error('Error loading test data:', error);
+                return false;
+            }
+        }
+
         // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Load test data first
+            await loadTestData();
+            
             // Set today's date as default
             document.getElementById('entry-date').valueAsDate = new Date();
             
@@ -2285,31 +2314,60 @@
             // Remove existing sync button first
             removeSyncButton();
             
+            const container = document.getElementById('sync-buttons-container-fixed');
+            if (!container) return;
+            
+            // Show the container
+            container.style.display = 'block';
+            
             const syncBtn = document.createElement('div');
             syncBtn.id = 'manual-sync-btn';
             syncBtn.innerHTML = '🔄 Sync';
             syncBtn.style.cssText = `
-                position: fixed;
-                top: 110px;
-                left: 50%;
-                transform: translateX(-50%);
+                display: inline-block;
                 padding: 8px 16px;
                 background-color: #3498db;
                 color: white;
                 border-radius: 20px;
                 font-size: 12px;
                 font-weight: 600;
-                z-index: 1000;
                 cursor: pointer;
                 transition: all 0.3s ease;
                 box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+                margin: 0 5px;
             `;
             syncBtn.onclick = performManualSync;
             syncBtn.title = 'Manually sync all data to Dropbox';
-            document.body.appendChild(syncBtn);
+            
+            const statusBtn = document.createElement('div');
+            statusBtn.id = 'connection-status-btn';
+            statusBtn.innerHTML = '☁️ Connected';
+            statusBtn.style.cssText = `
+                display: inline-block;
+                padding: 8px 16px;
+                background-color: #27ae60;
+                color: white;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+                margin: 0 5px;
+            `;
+            statusBtn.onclick = disconnectDropbox;
+            statusBtn.title = 'Click to disconnect from Dropbox';
+            
+            container.appendChild(syncBtn);
+            container.appendChild(statusBtn);
         }
 
         function removeSyncButton() {
+            const container = document.getElementById('sync-buttons-container-fixed');
+            if (container) {
+                container.innerHTML = '';
+                container.style.display = 'none';
+            }
             const existingSyncBtn = document.getElementById('manual-sync-btn');
             if (existingSyncBtn) {
                 existingSyncBtn.remove();
@@ -4446,6 +4504,49 @@
         // Habit rules storage and management
         function getHabitRules(habitId) {
             try {
+                // First check the new format from habits data
+                const habitsData = getHabitsSync();
+                console.log(`getHabitRules for ${habitId} - all habits:`, habitsData);
+                const habit = habitsData.find(h => h.id === habitId);
+                console.log(`getHabitRules for ${habitId} - found habit:`, habit);
+                
+                if (habit && habit.frequencies) {
+                    console.log(`Found habit with frequencies:`, habit);
+                    const rules = {
+                        weeklyLimits: {},
+                        monthlyMinimums: {},
+                        fine: { 
+                            perOver: habit.fineAmount || 0, 
+                            perUnder: habit.fineAmount || 0, 
+                            currency: '$' 
+                        }
+                    };
+                    
+                    // Convert frequencies to rules format
+                    habit.frequencies.forEach(freq => {
+                        console.log(`Processing frequency:`, freq);
+                        if (freq.frequency === 'weekly') {
+                            // For negative tracking values (like "no"), these are limits (max allowed)
+                            if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed') {
+                                rules.weeklyLimits[freq.trackingValue] = freq.number;
+                                console.log(`Added weekly limit: ${freq.trackingValue} = ${freq.number}`);
+                            } else {
+                                // For positive tracking values, these are minimums (required)
+                                rules.weeklyMinimums[freq.trackingValue] = freq.number;
+                                console.log(`Added weekly minimum: ${freq.trackingValue} = ${freq.number}`);
+                            }
+                        } else if (freq.frequency === 'monthly') {
+                            rules.monthlyMinimums[freq.trackingValue] = freq.number;
+                            console.log(`Added monthly minimum: ${freq.trackingValue} = ${freq.number}`);
+                        }
+                    });
+                    
+                    console.log(`Converted rules for habit ${habitId}:`, rules);
+                    return rules;
+                }
+                
+                console.log(`No habit found with frequencies for ${habitId}, using fallback`);
+                // Fall back to old format
                 const rules = JSON.parse(localStorage.getItem('habitRules') || '{}');
                 return rules[habitId] || {
                     weeklyLimits: {},
