@@ -2239,11 +2239,16 @@
             
             try {
                 const response = await dbx.filesDownload({ path: '/habit-tracker-data.json' });
-                const fileContent = await response.result.fileBinary.text();
+                console.log('Dropbox response:', response);
+                
+                // Correct way to access file content from Dropbox API
+                const fileContent = await response.fileBinary.text();
+                console.log('Successfully loaded data from Dropbox');
                 return JSON.parse(fileContent);
             } catch (error) {
-                if (error.status === 409) {
+                if (error.status === 409 || error.error_summary?.includes('not_found')) {
                     // File doesn't exist yet, which is fine for first time users
+                    console.log('Dropbox file not found - this is normal for first time users');
                     return null;
                 }
                 console.error('Error loading from cloud:', error);
@@ -2253,13 +2258,13 @@
 
         // Sync Button Functions
         function createSyncButton() {
-            // Remove existing sync button first
-            removeSyncButton();
+            // Don't call removeSyncButton() - just create the connected buttons
             
             const container = document.getElementById('sync-buttons-container-fixed');
             if (!container) return;
             
-            // Show the container
+            // Clear container completely and show it
+            container.innerHTML = '';
             container.style.display = 'block';
             
             const syncBtn = document.createElement('div');
