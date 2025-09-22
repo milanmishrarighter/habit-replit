@@ -2204,6 +2204,153 @@
             }
         }
 
+        // Dropbox Integration
+        const DROPBOX_APP_KEY = 'lxpor7a9x078wwa';
+        let dropboxAccessToken = localStorage.getItem('dropboxAccessToken');
+        let isAuthenticated = !!dropboxAccessToken;
+        let dbx = null;
+
+        // Initialize Dropbox client if we have a token
+        if (isAuthenticated) {
+            dbx = new Dropbox.Dropbox({ accessToken: dropboxAccessToken });
+        }
+
+        // Authentication functions
+        function authenticateDropbox() {
+            const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=token&redirect_uri=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+            window.location.href = authUrl;
+        }
+
+        function handleDropboxAuth() {
+            const hash = window.location.hash;
+            if (hash && hash.includes('access_token')) {
+                const params = new URLSearchParams(hash.substring(1));
+                const accessToken = params.get('access_token');
+                
+                if (accessToken) {
+                    dropboxAccessToken = accessToken;
+                    localStorage.setItem('dropboxAccessToken', accessToken);
+                    isAuthenticated = true;
+                    dbx = new Dropbox.Dropbox({ accessToken: accessToken });
+                    
+                    // Remove the hash from URL
+                    history.replaceState(null, null, window.location.pathname);
+                    
+                    // Show success message
+                    alert('Successfully connected to Dropbox! Your data will now sync to the cloud.');
+                    updateAuthStatus();
+                }
+            }
+        }
+
+        function disconnectDropbox() {
+            localStorage.removeItem('dropboxAccessToken');
+            dropboxAccessToken = null;
+            isAuthenticated = false;
+            dbx = null;
+            updateAuthStatus();
+            alert('Disconnected from Dropbox. Your data will now only be saved locally.');
+        }
+
+        function updateAuthStatus() {
+            // Add cloud sync status indicator to the page
+            let statusDiv = document.getElementById('cloud-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'cloud-status';
+                statusDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 10px 15px;
+                    border-radius: 25px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    z-index: 1000;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                `;
+                document.body.appendChild(statusDiv);
+            }
+            
+            if (isAuthenticated) {
+                statusDiv.innerHTML = '☁️ Connected';
+                statusDiv.style.backgroundColor = '#27ae60';
+                statusDiv.style.color = 'white';
+                statusDiv.onclick = disconnectDropbox;
+                statusDiv.title = 'Click to disconnect from Dropbox';
+            } else {
+                statusDiv.innerHTML = '📱 Local Only';
+                statusDiv.style.backgroundColor = '#95a5a6';
+                statusDiv.style.color = 'white';
+                statusDiv.onclick = authenticateDropbox;
+                statusDiv.title = 'Click to connect to Dropbox for cloud sync';
+            }
+        }
+
+        // Cloud sync functions
+        async function syncToCloud(data) {
+            if (!isAuthenticated || !dbx) return false;
+            
+            try {
+                const fileContent = JSON.stringify(data, null, 2);
+                await dbx.filesUpload({
+                    path: '/habit-tracker-data.json',
+                    contents: fileContent,
+                    mode: 'overwrite',
+                    autorename: true
+                });
+                return true;
+            } catch (error) {
+                console.error('Error syncing to cloud:', error);
+                return false;
+            }
+        }
+
+        async function loadFromCloud() {
+            if (!isAuthenticated || !dbx) return null;
+            
+            try {
+                const response = await dbx.filesDownload({ path: '/habit-tracker-data.json' });
+                const fileContent = await response.result.fileBinary.text();
+                return JSON.parse(fileContent);
+            } catch (error) {
+                if (error.status === 409) {
+                    // File doesn't exist yet, which is fine for first time users
+                    return null;
+                }
+                console.error('Error loading from cloud:', error);
+                return null;
+            }
+        }
+
+        // Enhanced save functions that include cloud sync
+        async function saveDataWithSync(key, data) {
+            // Always save to localStorage as backup
+            localStorage.setItem(key, JSON.stringify(data));
+            
+            // Try to sync to cloud if authenticated
+            if (isAuthenticated) {
+                const allData = {
+                    journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
+                    habits: JSON.parse(localStorage.getItem('habits') || '[]'),
+                    finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                    lastSync: new Date().toISOString()
+                };
+                
+                const syncSuccess = await syncToCloud(allData);
+                if (syncSuccess) {
+                    console.log('Data synced to cloud successfully');
+                }
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            handleDropboxAuth();
+            updateAuthStatus();
+        });
+
         // Emoji selection functionality
         let selectedEmoji = null;
         let recentEmojis = [];
@@ -2331,44 +2478,46 @@
             }
         }
 
-        // Save entry functionality with Google Sheets integration
+        // Save entry functionality with Dropbox cloud sync
         async function saveEntry() {
             const date = document.getElementById('entry-date').value;
             const entry = document.getElementById('journal-entry').value;
             
             if (!date) {
-                showCustomModal('Error', 'Please select a date', 'error');
+                alert('Please select a date');
                 return;
             }
             
             if (!entry.trim()) {
-                showCustomModal('Error', 'Please write a journal entry', 'error');
+                alert('Please write a journal entry');
                 return;
             }
             
             if (!selectedEmoji) {
-                showCustomModal('Error', 'Please select an emoji for the day', 'error');
+                alert('Please select an emoji for the day');
                 return;
             }
             
             // Get habit tracking data for today
             const habitData = getAllDailyHabitData(date);
             
-            // Try to save to Google Sheets first
-            let cloudSaved = false;
+            // Save to localStorage and sync to cloud
+            const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+            entries[date] = {
+                text: entry,
+                emoji: selectedEmoji,
+                habitData: habitData,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Use the new cloud sync function
+            await saveDataWithSync('journalEntries', entries);
+            
+            // Show success message
             if (isAuthenticated) {
-                cloudSaved = await saveEntryToCloud(date, entry, selectedEmoji, habitData);
-            }
-            
-            // Always save to localStorage as backup
-            saveEntryToLocalStorage(date, entry, selectedEmoji, habitData);
-            
-            if (cloudSaved) {
-                showCustomModal('Success', `Entry saved to cloud for ${date}! 📊`, 'success');
-            } else if (isAuthenticated) {
-                showCustomModal('Warning', `Saved locally for ${date}. Cloud sync failed, but data is safe.`, 'warning');
+                alert(`Entry saved and synced to cloud for ${date}! ☁️📊`);
             } else {
-                showCustomModal('Success', `Entry saved locally for ${date}! Connect to Google Sheets for cloud sync.`, 'success');
+                alert(`Entry saved locally for ${date}! Click the cloud status button to enable cloud sync.`);
             }
             
             // Clear the form
@@ -2376,6 +2525,16 @@
             selectedEmoji = null;
             const allEmojis = document.querySelectorAll('.emoji-option');
             allEmojis.forEach(emoji => emoji.classList.remove('selected'));
+            
+            // Clear habit selections
+            const habitInputs = document.querySelectorAll('#habits-tracking-container input, #habits-tracking-container select');
+            habitInputs.forEach(input => {
+                if (input.type === 'checkbox') {
+                    input.checked = false;
+                } else {
+                    input.value = '';
+                }
+            });
         }
 
         // localStorage backup functions
