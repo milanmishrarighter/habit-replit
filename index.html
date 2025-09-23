@@ -4714,6 +4714,27 @@
                 }
             }
             
+            // Weekly minimum warnings (for positive tracking values like "yes", "go", etc.)
+            if (rules.weeklyMinimums) {
+                for (const [valueKey, minCount] of Object.entries(rules.weeklyMinimums)) {
+                    const currentCount = weekCounts[valueKey] || 0;
+                    const remaining = minCount - currentCount;
+                    
+                    if (remaining > 0) {
+                        const today = new Date();
+                        const currentWeekDay = today.getDay();
+                        const daysUntilSunday = currentWeekDay === 0 ? 0 : 7 - currentWeekDay;
+                        const urgency = daysUntilSunday <= 1 ? 'high' : daysUntilSunday <= 2 ? 'medium' : 'low';
+                        
+                        warnings.push({
+                            type: 'weekly',
+                            urgency: urgency,
+                            message: `you need ${remaining} more "${valueKey}" to avoid weekly fine (₹500 penalty)`
+                        });
+                    }
+                }
+            }
+            
             // Monthly minimum warnings
             for (const [valueKey, minCount] of Object.entries(rules.monthlyMinimums)) {
                 const currentCount = monthCounts[valueKey] || 0;
@@ -4728,7 +4749,7 @@
                     warnings.push({
                         type: 'monthly',
                         urgency: urgency,
-                        message: `You've hit ${currentCount} "${valueKey}" - you need ${remaining} more this month`
+                        message: `you have already hit ${currentCount} "${valueKey}". please avoid it coz u only have ${remaining} more left for the month.`
                     });
                 }
             }
@@ -4736,6 +4757,96 @@
             return warnings;
         }
         
+        // Generate and get all fines based on habit violations
+        function getFines() {
+            const habits = getHabitsSync();
+            const generatedFines = [];
+            const today = new Date();
+            
+            habits.forEach(habit => {
+                if (!habit.fineAmount || habit.fineAmount <= 0) return;
+                
+                // Check weekly violations for limits (like "no" violations)
+                if (habit.frequencies) {
+                    habit.frequencies.forEach(freq => {
+                        if (freq.frequency === 'weekly') {
+                            const weekCounts = computeWeekCounts(habit.id);
+                            const currentCount = weekCounts[freq.trackingValue] || 0;
+                            
+                            // Check if this is a limit (negative values like "no")
+                            if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed') {
+                                if (currentCount > freq.number) {
+                                    const weekStart = getWeekStart(today);
+                                    const fineId = `${habit.id}_weekly_limit_${formatDate(weekStart)}`;
+                                    
+                                    generatedFines.push({
+                                        id: fineId,
+                                        habitId: habit.id,
+                                        habitName: habit.name,
+                                        amount: `₹${habit.fineAmount}`,
+                                        ruleType: 'weeklyLimit',
+                                        periodKey: `Week of ${formatDate(weekStart)}`,
+                                        status: 'committed',
+                                        violation: `${currentCount}/${freq.number} ${freq.trackingValue}`
+                                    });
+                                }
+                            } 
+                            // Check if this is a minimum requirement (positive values like "go", "yes")
+                            else {
+                                if (currentCount < freq.number) {
+                                    const weekStart = getWeekStart(today);
+                                    const weekEnd = new Date(weekStart);
+                                    weekEnd.setDate(weekEnd.getDate() + 6);
+                                    
+                                    // Only register fine if week is completed (past Sunday)
+                                    if (today.getDay() === 0 || today > weekEnd) {
+                                        const fineId = `${habit.id}_weekly_minimum_${formatDate(weekStart)}`;
+                                        
+                                        generatedFines.push({
+                                            id: fineId,
+                                            habitId: habit.id,
+                                            habitName: habit.name,
+                                            amount: `₹${habit.fineAmount}`,
+                                            ruleType: 'weeklyMinimum',
+                                            periodKey: `Week of ${formatDate(weekStart)}`,
+                                            status: 'committed',
+                                            violation: `${currentCount}/${freq.number} ${freq.trackingValue}`
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // Merge with saved fines from localStorage
+            const savedFines = JSON.parse(localStorage.getItem('fines') || '[]');
+            const allFines = [...savedFines];
+            
+            // Add new generated fines if they don't already exist
+            generatedFines.forEach(newFine => {
+                if (!allFines.find(f => f.id === newFine.id)) {
+                    allFines.push(newFine);
+                }
+            });
+            
+            // Save updated fines
+            localStorage.setItem('fines', JSON.stringify(allFines));
+            
+            return allFines;
+        }
+
+        // Helper function to get week start (Monday)
+        function getWeekStart(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+            d.setDate(diff);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
         function loadFines() {
             console.log('Loading fines...');
             displayCommittedFines();
@@ -4784,6 +4895,25 @@
             }).join('');
             
             committedContainer.innerHTML = finesHtml;
+        }
+
+        // Update fine status function
+        function updateFineStatus(fineId, newStatus) {
+            const fines = JSON.parse(localStorage.getItem('fines') || '[]');
+            const fineIndex = fines.findIndex(f => f.id === fineId);
+            
+            if (fineIndex !== -1) {
+                fines[fineIndex].status = newStatus;
+                localStorage.setItem('fines', JSON.stringify(fines));
+                
+                // Trigger sync if available
+                if (isAuthenticated && dbx) {
+                    triggerLiveSync('Fine status updated');
+                }
+                
+                // Refresh the fines display
+                loadFines();
+            }
         }
         
         function displayPossibleWarnings() {
@@ -4899,11 +5029,13 @@
                         
                         const goalItem = document.createElement('div');
                         goalItem.className = 'goal-item';
+                        goalItem.style.backgroundColor = habit.color + '20'; // Add transparency to habit color
+                        goalItem.style.border = `2px solid ${habit.color}`;
                         goalItem.innerHTML = `
                             <div class="goal-header">
                                 <h4 style="color: ${habit.color}">${habit.name}</h4>
                                 <div class="goal-progress">
-                                    <span class="progress-text">${progress.achieved}/${goal.amount} units</span>
+                                    <span class="progress-text">${progress.achieved}/${goal.amount}</span>
                                     <span class="progress-percentage">${Math.round(progress.percentage)}%</span>
                                 </div>
                             </div>
@@ -4911,9 +5043,8 @@
                                 <div class="progress-fill" style="width: ${Math.min(progress.percentage, 100)}%; background-color: ${habit.color}"></div>
                             </div>
                             <div class="goal-details">
-                                <p><strong>Target:</strong> ${goal.amount} units in ${new Date().getFullYear()}</p>
-                                <p><strong>Goals Left:</strong> ${remaining} units remaining</p>
-                                <p><strong>Daily pace needed:</strong> ${dailyPaceNeeded} units/day</p>
+                                <p><strong>Target:</strong> ${goal.amount} in ${new Date().getFullYear()}</p>
+                                <p><strong>Goals Left:</strong> ${remaining} remaining</p>
                             </div>
                         `;
                         
@@ -4970,13 +5101,14 @@
             
             let achieved = 0;
             
-            // Count all instances where contributingValues were tracked this year
+            // Count all instances where contributingValues were checked this year
             Object.entries(dailyTracking).forEach(([date, dayData]) => {
                 const entryYear = new Date(date).getFullYear();
                 if (entryYear === currentYear && dayData[habit.id]) {
                     const habitData = dayData[habit.id];
+                    // Count each contributing value that was checked
                     goal.contributingValues.forEach(value => {
-                        if (habitData[value]) {
+                        if (habitData[value] === true) {  // Explicitly check for true (checkbox marked)
                             achieved++;
                         }
                     });
