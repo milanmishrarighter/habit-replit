@@ -4576,248 +4576,275 @@
             monthCountsCache.clear();
         }
         
-        // Habit rules storage and management
-        function getHabitRules(habitId) {
-            try {
-                // First check the new format from habits data
-                const habitsData = getHabitsSync();
-                console.log(`getHabitRules for ${habitId} - all habits:`, habitsData);
-                const habit = habitsData.find(h => h.id === habitId);
-                console.log(`getHabitRules for ${habitId} - found habit:`, habit);
-                
-                if (habit && habit.frequencies) {
-                    console.log(`Found habit with frequencies:`, habit);
-                    const rules = {
-                        weeklyLimits: {},
-                        monthlyMinimums: {},
-                        fine: { 
-                            perOver: habit.fineAmount || 0, 
-                            perUnder: habit.fineAmount || 0, 
-                            currency: '₹' 
-                        }
-                    };
-                    
-                    // Convert frequencies to rules format
-                    habit.frequencies.forEach(freq => {
-                        console.log(`Processing frequency:`, freq);
-                        console.log(`Rules before processing:`, JSON.stringify(rules));
-                        if (freq.frequency === 'weekly') {
-                            // For negative tracking values (like "no"), these are limits (max allowed)
-                            if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed') {
-                                if (!rules.weeklyLimits) {
-                                    console.error(`weeklyLimits is undefined! Full rules:`, rules);
-                                    rules.weeklyLimits = {};
-                                }
-                                rules.weeklyLimits[freq.trackingValue] = freq.number;
-                                console.log(`Added weekly limit: ${freq.trackingValue} = ${freq.number}`);
-                            } else {
-                                // For positive tracking values, these are minimums (required)
-                                if (!rules.weeklyMinimums) {
-                                    console.error(`weeklyMinimums is undefined! Full rules:`, rules);
-                                    rules.weeklyMinimums = {};
-                                }
-                                rules.weeklyMinimums[freq.trackingValue] = freq.number;
-                                console.log(`Added weekly minimum: ${freq.trackingValue} = ${freq.number}`);
-                            }
-                        } else if (freq.frequency === 'monthly') {
-                            if (!rules.monthlyMinimums) {
-                                console.error(`monthlyMinimums is undefined! Full rules:`, rules);
-                                rules.monthlyMinimums = {};
-                            }
-                            rules.monthlyMinimums[freq.trackingValue] = freq.number;
-                            console.log(`Added monthly minimum: ${freq.trackingValue} = ${freq.number}`);
-                        }
-                        console.log(`Rules after processing:`, JSON.stringify(rules));
-                    });
-                    
-                    console.log(`Converted rules for habit ${habitId}:`, rules);
-                    return rules;
-                }
-                
-                console.log(`No habit found with frequencies for ${habitId}, using fallback`);
-                // Fall back to old format
-                const rules = JSON.parse(localStorage.getItem('habitRules') || '{}');
-                return rules[habitId] || {
-                    weeklyLimits: {},
-                    monthlyMinimums: {},
-                    fine: { perOver: 0, perUnder: 0, currency: '₹' }
-                };
-            } catch (error) {
-                console.error('Error loading habit rules:', error);
-                return { weeklyLimits: {}, monthlyMinimums: {}, fine: { perOver: 0, perUnder: 0, currency: '₹' } };
-            }
-        }
-        
-        function saveHabitRules(habitId, rules) {
-            try {
-                const allRules = JSON.parse(localStorage.getItem('habitRules') || '{}');
-                allRules[habitId] = rules;
-                localStorage.setItem('habitRules', JSON.stringify(allRules));
-                
-                // Trigger sync for habit rules
-                triggerLiveSync('Habit rules updated');
-            } catch (error) {
-                console.error('Error saving habit rules:', error);
-            }
-        }
-        
-        // Fine storage and management
-        function getFines() {
-            try {
-                return JSON.parse(localStorage.getItem('fines') || '[]');
-            } catch (error) {
-                console.error('Error loading fines:', error);
-                return [];
-            }
-        }
-        
-        function saveFines(fines) {
-            try {
-                localStorage.setItem('fines', JSON.stringify(fines));
-                triggerLiveSync('Fines updated');
-            } catch (error) {
-                console.error('Error saving fines:', error);
-            }
-        }
+        // Old functions removed - using new period-based fines system
         
         // Live warnings calculation
         function calculateWarnings(habitId) {
-            const rules = getHabitRules(habitId);
-            const weekCounts = computeWeekCounts(habitId);
-            const monthCounts = computeMonthCounts(habitId);
-            console.log(`calculateWarnings for habit ${habitId}:`, {rules, weekCounts, monthCounts});
-            const warnings = [];
-            
-            // Weekly limit warnings (positive messaging)
-            for (const [valueKey, maxCount] of Object.entries(rules.weeklyLimits)) {
-                const currentCount = weekCounts[valueKey] || 0;
-                const remaining = maxCount - currentCount;
-                
-                if (remaining > 0) {
-                    warnings.push({
-                        type: 'weekly',
-                        urgency: remaining <= 1 ? 'high' : remaining <= 2 ? 'medium' : 'low',
-                        message: `✅ Great! You can still avoid ${remaining} more "${valueKey}" this week`
-                    });
-                } else if (remaining === 0) {
-                    warnings.push({
-                        type: 'weekly',
-                        urgency: 'high',
-                        message: `⚠️ "${valueKey}" limit reached - be careful this week!`
-                    });
-                } else {
-                    warnings.push({
-                        type: 'weekly',
-                        urgency: 'critical',
-                        message: `❌ You've exceeded your "${valueKey}" limit this week - ₹500 fine applies`
-                    });
-                }
+            const habit = getHabitsSync().find(h => h.id === habitId);
+            if (!habit || !habit.frequencies || !habit.fineAmount || habit.fineAmount <= 0) {
+                return [];
             }
             
-            // Weekly minimum warnings (for positive tracking values like "yes", "go", etc.)
-            if (rules.weeklyMinimums) {
-                for (const [valueKey, minCount] of Object.entries(rules.weeklyMinimums)) {
-                    const currentCount = weekCounts[valueKey] || 0;
-                    const remaining = minCount - currentCount;
-                    
-                    if (remaining > 0) {
-                        const today = new Date();
-                        const currentWeekDay = today.getDay();
-                        const daysUntilSunday = currentWeekDay === 0 ? 0 : 7 - currentWeekDay;
-                        const urgency = daysUntilSunday <= 1 ? 'high' : daysUntilSunday <= 2 ? 'medium' : 'low';
+            const entries = JSON.parse(localStorage.getItem('entries') || '[]');
+            const dateIndex = buildDateIndex(entries);
+            const today = new Date();
+            const warnings = [];
+            
+            // Get committed fines to exclude from warnings
+            const committedFines = getFines().filter(f => f.status === 'unpaid' || f.status === 'paid');
+            
+            // Get current period dates for warning calculations
+            const currentWeekStart = getWeekStart(today);
+            const currentWeekDates = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(currentWeekStart);
+                d.setDate(currentWeekStart.getDate() + i);
+                currentWeekDates.push(formatDate(d));
+            }
+            
+            const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            const currentMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            const currentMonthDates = [];
+            for (let d = new Date(currentMonthStart); d <= currentMonthEnd; d.setDate(d.getDate() + 1)) {
+                currentMonthDates.push(formatDate(d));
+            }
+            
+            habit.frequencies.forEach(freq => {
+                const currentWeekId = getWeekId(currentWeekStart);
+                const currentMonthId = getMonthId(currentMonthStart);
+                const fineId = freq.frequency === 'weekly' ? 
+                    `${currentWeekId}:${habit.id}:${freq.trackingValue}` : 
+                    `${currentMonthId}:${habit.id}:${freq.trackingValue}`;
+                
+                // Skip if this already has a committed fine
+                if (committedFines.some(f => f.id === fineId)) {
+                    return;
+                }
+                
+                const periodDates = freq.frequency === 'weekly' ? currentWeekDates : currentMonthDates;
+                const periodId = freq.frequency === 'weekly' ? currentWeekId : currentMonthId;
+                const counts = computePeriodCounts(habit.id, periodDates, entries);
+                const currentCount = counts[freq.trackingValue] || 0;
+                const effectiveLimit = getEffectiveLimit(habit.id, freq.trackingValue, freq.number, periodId, freq.frequency);
+                
+                // Check if this is a limit (negative values like "no") 
+                if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed') {
+                    if (currentCount < effectiveLimit && currentCount > 0) {
+                        const remaining = effectiveLimit - currentCount;
+                        const urgency = remaining <= 1 ? 'high' : remaining <= 2 ? 'medium' : 'low';
+                        warnings.push({
+                            type: freq.frequency,
+                            urgency: urgency,
+                            message: `you have already hit ${currentCount} '${freq.trackingValue}'. please avoid it coz u only have ${remaining} more left for the ${freq.frequency === 'weekly' ? 'week' : 'month'}.`
+                        });
+                    }
+                } else {
+                    // This is a minimum requirement
+                    if (currentCount < effectiveLimit) {
+                        const remaining = effectiveLimit - currentCount;
+                        const urgency = freq.frequency === 'weekly' ? 
+                            (today.getDay() >= 5 ? 'high' : today.getDay() >= 3 ? 'medium' : 'low') :
+                            (today.getDate() >= 25 ? 'high' : today.getDate() >= 20 ? 'medium' : 'low');
                         
                         warnings.push({
-                            type: 'weekly',
+                            type: freq.frequency,
                             urgency: urgency,
-                            message: `you need ${remaining} more "${valueKey}" to avoid weekly fine (₹500 penalty)`
+                            message: `you need ${remaining} more '${freq.trackingValue}' to meet your ${freq.frequency} goal.`
                         });
                     }
                 }
-            }
-            
-            // Monthly minimum warnings
-            for (const [valueKey, minCount] of Object.entries(rules.monthlyMinimums)) {
-                const currentCount = monthCounts[valueKey] || 0;
-                const remaining = minCount - currentCount;
-                
-                if (remaining > 0) {
-                    const today = new Date();
-                    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-                    const daysLeft = daysInMonth - today.getDate();
-                    const urgency = daysLeft <= 3 ? 'high' : daysLeft <= 7 ? 'medium' : 'low';
-                    
-                    warnings.push({
-                        type: 'monthly',
-                        urgency: urgency,
-                        message: `you have already hit ${currentCount} "${valueKey}". please avoid it coz u only have ${remaining} more left for the month.`
-                    });
-                }
-            }
+            });
             
             return warnings;
         }
         
+        // Period Detection Utilities
+        function buildDateIndex(entries) {
+            const dateMap = new Map();
+            entries.forEach(entry => {
+                if (entry.date) {
+                    dateMap.set(entry.date, entry);
+                }
+            });
+            return dateMap;
+        }
+
+        function getWeekId(date) {
+            const d = new Date(date);
+            const yearStart = new Date(d.getFullYear(), 0, 1);
+            const weekNum = Math.ceil((d - yearStart + (yearStart.getDay() + 1) * 86400000) / (7 * 86400000));
+            return `${d.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+        }
+
+        function getMonthId(date) {
+            const d = new Date(date);
+            return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+        }
+
+        function findLastCompletedWeek(dateIndex) {
+            const today = new Date();
+            
+            // Start from last week and work backwards
+            for (let weeksAgo = 1; weeksAgo <= 8; weeksAgo++) {
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - (today.getDay() || 7) - 1 - (weeksAgo - 1) * 7);
+                weekStart.setHours(0, 0, 0, 0);
+                
+                // Check if all 7 days of this week have entries
+                let hasAllDays = true;
+                const weekDates = [];
+                
+                for (let i = 0; i < 7; i++) {
+                    const checkDate = new Date(weekStart);
+                    checkDate.setDate(weekStart.getDate() + i);
+                    const dateStr = formatDate(checkDate);
+                    weekDates.push(dateStr);
+                    
+                    if (!dateIndex.has(dateStr)) {
+                        hasAllDays = false;
+                        break;
+                    }
+                }
+                
+                if (hasAllDays) {
+                    const weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekStart.getDate() + 6);
+                    return {
+                        periodId: getWeekId(weekStart),
+                        start: weekStart,
+                        end: weekEnd,
+                        dates: weekDates
+                    };
+                }
+            }
+            
+            return null;
+        }
+
+        function findLastCompletedMonth(dateIndex) {
+            const today = new Date();
+            
+            // Start from last month and work backwards
+            for (let monthsAgo = 1; monthsAgo <= 6; monthsAgo++) {
+                const checkMonth = new Date(today.getFullYear(), today.getMonth() - monthsAgo, 1);
+                const monthStart = new Date(checkMonth.getFullYear(), checkMonth.getMonth(), 1);
+                const monthEnd = new Date(checkMonth.getFullYear(), checkMonth.getMonth() + 1, 0);
+                
+                // Check if all days of this month have entries
+                let hasAllDays = true;
+                const monthDates = [];
+                
+                for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+                    const dateStr = formatDate(d);
+                    monthDates.push(dateStr);
+                    
+                    if (!dateIndex.has(dateStr)) {
+                        hasAllDays = false;
+                        break;
+                    }
+                }
+                
+                if (hasAllDays) {
+                    return {
+                        periodId: getMonthId(monthStart),
+                        start: monthStart,
+                        end: monthEnd,
+                        dates: monthDates
+                    };
+                }
+            }
+            
+            return null;
+        }
+
+        // Compute habit counts for a specific period
+        function computePeriodCounts(habitId, periodDates, entries) {
+            const counts = {};
+            const dateSet = new Set(periodDates);
+            
+            entries.forEach(entry => {
+                if (dateSet.has(entry.date) && entry.habits && entry.habits[habitId]) {
+                    const habitData = entry.habits[habitId];
+                    if (habitData.checkboxes) {
+                        Object.entries(habitData.checkboxes).forEach(([value, checked]) => {
+                            if (checked === true) {
+                                counts[value] = (counts[value] || 0) + 1;
+                            }
+                        });
+                    }
+                }
+            });
+            
+            return counts;
+        }
+
+        // Get effective limit considering out-of-control passes used
+        function getEffectiveLimit(habitId, ruleValue, baseLimit, periodId, frequency) {
+            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
+            const periodUsage = oocUsage[periodId] || {};
+            const habitUsage = periodUsage[habitId] || {};
+            
+            const usedPasses = frequency === 'weekly' ? (habitUsage.weekUsed || 0) : (habitUsage.monthUsed || 0);
+            return Math.max(0, baseLimit - usedPasses);
+        }
+
         // Generate and get all fines based on habit violations
         function getFines() {
             const habits = getHabitsSync();
+            const entries = JSON.parse(localStorage.getItem('entries') || '[]');
+            const dateIndex = buildDateIndex(entries);
+            
+            const lastWeek = findLastCompletedWeek(dateIndex);
+            const lastMonth = findLastCompletedMonth(dateIndex);
+            
             const generatedFines = [];
-            const today = new Date();
             
             habits.forEach(habit => {
-                if (!habit.fineAmount || habit.fineAmount <= 0) return;
+                if (!habit.fineAmount || habit.fineAmount <= 0 || !habit.frequencies) return;
                 
-                // Check weekly violations for limits (like "no" violations)
-                if (habit.frequencies) {
-                    habit.frequencies.forEach(freq => {
-                        if (freq.frequency === 'weekly') {
-                            const weekCounts = computeWeekCounts(habit.id);
-                            const currentCount = weekCounts[freq.trackingValue] || 0;
-                            
-                            // Check if this is a limit (negative values like "no")
-                            if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed') {
-                                if (currentCount > freq.number) {
-                                    const weekStart = getWeekStart(today);
-                                    const fineId = `${habit.id}_weekly_limit_${formatDate(weekStart)}`;
-                                    
-                                    generatedFines.push({
-                                        id: fineId,
-                                        habitId: habit.id,
-                                        habitName: habit.name,
-                                        amount: `₹${habit.fineAmount}`,
-                                        ruleType: 'weeklyLimit',
-                                        periodKey: `Week of ${formatDate(weekStart)}`,
-                                        status: 'committed',
-                                        violation: `${currentCount}/${freq.number} ${freq.trackingValue}`
-                                    });
-                                }
-                            } 
-                            // Check if this is a minimum requirement (positive values like "go", "yes")
-                            else {
-                                if (currentCount < freq.number) {
-                                    const weekStart = getWeekStart(today);
-                                    const weekEnd = new Date(weekStart);
-                                    weekEnd.setDate(weekEnd.getDate() + 6);
-                                    
-                                    // Only register fine if week is completed (past Sunday)
-                                    if (today.getDay() === 0 || today > weekEnd) {
-                                        const fineId = `${habit.id}_weekly_minimum_${formatDate(weekStart)}`;
-                                        
-                                        generatedFines.push({
-                                            id: fineId,
-                                            habitId: habit.id,
-                                            habitName: habit.name,
-                                            amount: `₹${habit.fineAmount}`,
-                                            ruleType: 'weeklyMinimum',
-                                            periodKey: `Week of ${formatDate(weekStart)}`,
-                                            status: 'committed',
-                                            violation: `${currentCount}/${freq.number} ${freq.trackingValue}`
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
+                habit.frequencies.forEach(freq => {
+                    let period = null;
+                    if (freq.frequency === 'weekly' && lastWeek) {
+                        period = lastWeek;
+                    } else if (freq.frequency === 'monthly' && lastMonth) {
+                        period = lastMonth;
+                    }
+                    
+                    if (!period) return;
+                    
+                    const counts = computePeriodCounts(habit.id, period.dates, entries);
+                    const actualCount = counts[freq.trackingValue] || 0;
+                    const effectiveLimit = getEffectiveLimit(habit.id, freq.trackingValue, freq.number, period.periodId, freq.frequency);
+                    
+                    let violated = false;
+                    
+                    // Check if this is a limit (negative values like "no")
+                    if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed') {
+                        violated = actualCount > effectiveLimit;
+                    } else {
+                        // This is a minimum requirement
+                        violated = actualCount < effectiveLimit;
+                    }
+                    
+                    if (violated) {
+                        const fineId = `${period.periodId}:${habit.id}:${freq.trackingValue}`;
+                        
+                        generatedFines.push({
+                            id: fineId,
+                            periodId: period.periodId,
+                            habitId: habit.id,
+                            habitName: habit.name,
+                            ruleValue: freq.trackingValue,
+                            amount: `₹${habit.fineAmount}`,
+                            count: actualCount,
+                            limit: effectiveLimit,
+                            frequency: freq.frequency,
+                            status: 'unpaid',
+                            periodKey: `${freq.frequency === 'weekly' ? 'Week' : 'Month'} ${period.periodId}`,
+                            violation: `${actualCount}/${effectiveLimit} ${freq.trackingValue}`
+                        });
+                    }
+                });
             });
             
             // Merge with saved fines from localStorage
@@ -4859,7 +4886,7 @@
             
             if (!committedContainer) return;
             
-            const fines = getFines().filter(fine => fine.status === 'committed' || fine.status === 'pending');
+            const fines = getFines().filter(fine => fine.status === 'unpaid' || fine.status === 'paid');
             
             if (fines.length === 0) {
                 committedContainer.innerHTML = '';
@@ -4880,13 +4907,12 @@
                             <span class="fine-amount">${fine.amount}</span>
                         </div>
                         <div class="fine-details">
-                            <span class="fine-reason">${fine.ruleType === 'weeklyLimit' ? 'Weekly limit exceeded' : 'Monthly minimum missed'}</span>
+                            <span class="fine-reason">${fine.violation}</span>
                             <span class="fine-period">${fine.periodKey}</span>
                         </div>
                         <div class="fine-status">
                             <select onchange="updateFineStatus('${fine.id}', this.value)">
-                                <option value="pending" ${fine.status === 'pending' ? 'selected' : ''}>Pending</option>
-                                <option value="committed" ${fine.status === 'committed' ? 'selected' : ''}>Committed</option>
+                                <option value="unpaid" ${fine.status === 'unpaid' ? 'selected' : ''}>Unpaid</option>
                                 <option value="paid" ${fine.status === 'paid' ? 'selected' : ''}>Paid</option>
                             </select>
                         </div>
@@ -4914,6 +4940,101 @@
                 // Refresh the fines display
                 loadFines();
             }
+        }
+
+        // Out of Control Miss Functions
+        function getRemainingOOCPasses(habitId, frequency) {
+            const habit = getHabitsSync().find(h => h.id === habitId);
+            if (!habit || !habit.outOfControlMiss) return 0;
+            
+            const today = new Date();
+            const currentWeekId = getWeekId(getWeekStart(today));
+            const currentMonthId = getMonthId(new Date(today.getFullYear(), today.getMonth(), 1));
+            const periodId = frequency === 'weekly' ? currentWeekId : currentMonthId;
+            
+            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
+            const periodUsage = oocUsage[periodId] || {};
+            const habitUsage = periodUsage[habitId] || {};
+            
+            const usedPasses = frequency === 'weekly' ? (habitUsage.weekUsed || 0) : (habitUsage.monthUsed || 0);
+            return Math.max(0, habit.outOfControlMiss - usedPasses);
+        }
+
+        function useOOCPass(habitId, frequency) {
+            const remaining = getRemainingOOCPasses(habitId, frequency);
+            if (remaining <= 0) {
+                showModal('Warning', 'No out of control passes remaining for this habit!', 'warning');
+                return false;
+            }
+            
+            const today = new Date();
+            const currentWeekId = getWeekId(getWeekStart(today));
+            const currentMonthId = getMonthId(new Date(today.getFullYear(), today.getMonth(), 1));
+            const periodId = frequency === 'weekly' ? currentWeekId : currentMonthId;
+            
+            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
+            if (!oocUsage[periodId]) oocUsage[periodId] = {};
+            if (!oocUsage[periodId][habitId]) oocUsage[periodId][habitId] = {};
+            
+            if (frequency === 'weekly') {
+                oocUsage[periodId][habitId].weekUsed = (oocUsage[periodId][habitId].weekUsed || 0) + 1;
+            } else {
+                oocUsage[periodId][habitId].monthUsed = (oocUsage[periodId][habitId].monthUsed || 0) + 1;
+            }
+            
+            localStorage.setItem('oocUsage', JSON.stringify(oocUsage));
+            
+            // Trigger sync if available
+            if (isAuthenticated && dbx) {
+                triggerLiveSync('Out of control pass used');
+            }
+            
+            // Refresh warnings and fines display
+            loadFines();
+            
+            return true;
+        }
+
+        function getOOCDisplay(habitId) {
+            const habit = getHabitsSync().find(h => h.id === habitId);
+            if (!habit || !habit.outOfControlMiss || !habit.frequencies) return '';
+            
+            // Count total remaining passes across all frequencies
+            let totalRemaining = 0;
+            habit.frequencies.forEach(freq => {
+                totalRemaining += getRemainingOOCPasses(habitId, freq.frequency);
+            });
+            
+            return `
+                <div class="ooc-section">
+                    <label class="ooc-toggle-label">
+                        <input type="checkbox" class="ooc-toggle" 
+                               onchange="handleOOCToggle('${habitId}', this.checked)">
+                        Out of Control Miss 
+                        <span class="ooc-counter">(${totalRemaining} left)</span>
+                    </label>
+                </div>
+            `;
+        }
+
+        function handleOOCToggle(habitId, isChecked) {
+            if (!isChecked) return;
+            
+            const habit = getHabitsSync().find(h => h.id === habitId);
+            if (!habit || !habit.frequencies) return;
+            
+            // For simplicity, apply to the first frequency found
+            const firstFreq = habit.frequencies[0];
+            if (firstFreq) {
+                const success = useOOCPass(habitId, firstFreq.frequency);
+                if (success) {
+                    showModal('Success', `Out of control pass used! This reduces your ${firstFreq.frequency} limit by 1.`, 'success');
+                }
+            }
+            
+            // Uncheck the checkbox after use
+            const checkbox = document.querySelector(`input[onchange*="${habitId}"]`);
+            if (checkbox) checkbox.checked = false;
         }
         
         function displayPossibleWarnings() {
