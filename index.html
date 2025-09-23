@@ -4576,7 +4576,86 @@
             monthCountsCache.clear();
         }
         
-        // Old functions removed - using new period-based fines system
+        // Fine storage and management functions
+        function getFines() {
+            try {
+                return JSON.parse(localStorage.getItem('fines') || '[]');
+            } catch (error) {
+                console.error('Error loading fines:', error);
+                return [];
+            }
+        }
+        
+        function saveFines(fines) {
+            try {
+                localStorage.setItem('fines', JSON.stringify(fines));
+                triggerLiveSync('Fines updated');
+            } catch (error) {
+                console.error('Error saving fines:', error);
+            }
+        }
+        
+        // Auto-commit fines when tracking frequency limits exceeded
+        function checkAndCommitImmediateFines() {
+            const habits = getHabitsSync();
+            const existingFines = getFines();
+            let newFinesCreated = false;
+            
+            habits.forEach(habit => {
+                if (!habit.frequencies || !habit.fineAmount || habit.fineAmount <= 0) return;
+                
+                // Check current week and month counts
+                const weekCounts = computeWeekCounts(habit.id);
+                const monthCounts = computeMonthCounts(habit.id);
+                
+                habit.frequencies.forEach(freq => {
+                    const counts = freq.frequency === 'weekly' ? weekCounts : monthCounts;
+                    const currentCount = counts[freq.trackingValue] || 0;
+                    const limit = freq.number;
+                    
+                    // Check if this is a limit that can be exceeded (negative tracking values)
+                    const isNegativeTracking = ['no', 'fail', 'missed', 'bare minimum'].includes(freq.trackingValue);
+                    let violation = null;
+                    
+                    if (isNegativeTracking && currentCount > limit) {
+                        // Exceeded a maximum limit
+                        violation = `${currentCount}/${limit} ${freq.trackingValue} (${freq.frequency})`;
+                    }
+                    
+                    if (violation) {
+                        // Create unique fine ID based on habit, period, and violation
+                        const now = new Date();
+                        const periodKey = freq.frequency === 'weekly' ? 
+                            getWeekKey(now) : getMonthKey(now);
+                        const fineId = `${habit.id}_${periodKey}_${freq.trackingValue}_${freq.frequency}`;
+                        
+                        // Check if this fine already exists
+                        const existingFine = existingFines.find(f => f.id === fineId);
+                        if (!existingFine) {
+                            const newFine = {
+                                id: fineId,
+                                habitId: habit.id,
+                                violation: violation,
+                                amount: `₹${habit.fineAmount}`,
+                                periodKey: periodKey,
+                                status: 'unpaid',
+                                dateCommitted: now.toISOString(),
+                                frequency: freq.frequency,
+                                trackingValue: freq.trackingValue
+                            };
+                            
+                            existingFines.push(newFine);
+                            newFinesCreated = true;
+                            console.log('Auto-committed fine:', newFine);
+                        }
+                    }
+                });
+            });
+            
+            if (newFinesCreated) {
+                saveFines(existingFines);
+            }
+        }
         
         // Live warnings calculation
         function calculateWarnings(habitId) {
@@ -4628,7 +4707,7 @@
                 const effectiveLimit = getEffectiveLimit(habit.id, freq.trackingValue, freq.number, periodId, freq.frequency);
                 
                 // Check if this is a limit (negative values like "no") 
-                if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed') {
+                if (freq.trackingValue === 'no' || freq.trackingValue === 'fail' || freq.trackingValue === 'missed' || freq.trackingValue === 'bare minimum') {
                     if (currentCount < effectiveLimit && currentCount > 0) {
                         const remaining = effectiveLimit - currentCount;
                         const urgency = remaining <= 1 ? 'high' : remaining <= 2 ? 'medium' : 'low';
@@ -4876,6 +4955,9 @@
 
         function loadFines() {
             console.log('Loading fines...');
+            // First check and commit any immediate fines
+            checkAndCommitImmediateFines();
+            // Then display everything
             displayCommittedFines();
             displayPossibleWarnings();
         }
