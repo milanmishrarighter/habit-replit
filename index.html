@@ -2314,66 +2314,19 @@
 
         // Cloud sync functions
         async function syncToCloud(data) {
-            if (!isAuthenticated || !dbx) {
-                console.warn('syncToCloud aborted: not authenticated');
-                return false;
-            }
-
+            if (!isAuthenticated || !dbx) return false;
+            
             try {
-                // Basic safety checks - refuse to overwrite with empty data
-                const hasEntries = data && (
-                    (data.journalEntries && Object.keys(data.journalEntries).length > 0) ||
-                    (data.dailyHabitTracking && Object.keys(data.dailyHabitTracking).length > 0) ||
-                    (data.habits && Array.isArray(data.habits) && data.habits.length > 0)
-                );
-                if (!hasEntries) {
-                    console.warn('syncToCloud aborted: data appears empty. Upload prevented to avoid accidental overwrite.');
-                    return false;
-                }
-
-                // Before overwriting, attempt to backup current remote file (store a copy under /backups/)
-                try {
-                    const existing = await dbx.filesDownload({ path: '/habit-tracker-data.json' });
-                    let existingText = null;
-                    if (existing && existing.result) {
-                        if (existing.result.fileBlob && typeof existing.result.fileBlob.text === 'function') {
-                            existingText = await existing.result.fileBlob.text();
-                        } else if (existing.result.fileBinary) {
-                            existingText = typeof existing.result.fileBinary === 'string' ? existing.result.fileBinary : String(existing.result.fileBinary);
-                        }
-                    }
-                    if (existingText) {
-                        const backupPath = `/backups/habit-tracker-data-${Date.now()}.json`;
-                        try {
-                            await dbx.filesUpload({
-                                path: backupPath,
-                                contents: existingText,
-                                mode: { '.tag': 'add' },
-                                autorename: true
-                            });
-                            console.log('Backup of remote file saved to', backupPath);
-                        } catch (bkErr) {
-                            console.warn('Failed to create remote backup before overwrite:', bkErr);
-                        }
-                    }
-                } catch (dlErr) {
-                    // No existing file or couldn't download - proceed cautiously
-                    console.warn('Could not download existing remote file for backup (may be missing)', dlErr);
-                }
-
-                // Now upload the new content with overwrite mode
                 const fileContent = JSON.stringify(data, null, 2);
                 await dbx.filesUpload({
                     path: '/habit-tracker-data.json',
                     contents: fileContent,
-                    mode: { '.tag': 'overwrite' },
-                    autorename: false
+                    mode: 'overwrite',
+                    autorename: true
                 });
-
-                console.log('syncToCloud: upload successful');
                 return true;
-            } catch (err) {
-                console.error('syncToCloud error (safe patch):', err);
+            } catch (error) {
+                console.error('Error syncing to cloud:', error);
                 return false;
             }
         }
@@ -5236,34 +5189,44 @@ function generateWeeklyFinesHistory() {
 
 
         // Generate all 52 weeks of 2025 with proper Monday-Sunday ranges
-        function generateYearWeeks(year) {
-            const weeks = [];
-            
-            // Find first Monday of the year
-            const jan1 = new Date(year, 0, 1);
-            const firstMonday = new Date(jan1);
-            const dayOfWeek = jan1.getDay();
-            const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-            firstMonday.setDate(jan1.getDate() + daysUntilMonday);
-            
-            // Generate 52 weeks
-            for (let weekNum = 1; weekNum <= 52; weekNum++) {
-                const weekStart = new Date(firstMonday);
-                weekStart.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
-                
-                const weekEnd = new Date(weekStart);
-                weekEnd.setDate(weekStart.getDate() + 6);
-                
-                weeks.push({
-                    weekNumber: weekNum,
-                    startDate: new Date(weekStart),
-                    endDate: new Date(weekEnd),
-                    dateRange: `${formatDateShort(weekStart)} - ${formatDateShort(weekEnd)}`
-                });
-            }
-            
-            return weeks;
+        
+function generateYearWeeks(year) {
+    // Return an array of 52 week objects: { weekNumber, startDate: 'YYYY-MM-DD', endDate: 'YYYY-MM-DD', dateRange }
+    // Week definition: Monday (start) to Sunday (end).
+    const weeks = [];
+    // Find the first Monday of the year (or the Monday of the week containing Jan 1)
+    const jan1 = new Date(year, 0, 1);
+    // Determine the Monday of the ISO week that contains Jan 1:
+    const day = jan1.getDay(); // 0=Sun,1=Mon,...6=Sat
+    const diffToMonday = (day === 0) ? -6 : (1 - day); // if Sunday, go back 6 days; else shift to Monday
+    const firstMonday = new Date(jan1);
+    firstMonday.setDate(jan1.getDate() + diffToMonday);
+    firstMonday.setHours(0,0,0,0,0);
+
+    // Build 52 weeks starting from firstMonday; each week is Mon -> Sun
+    for (let w = 1; w <= 52; w++) {
+        const start = new Date(firstMonday);
+        start.setDate(firstMonday.getDate() + (w - 1) * 7);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        // Format YYYY-MM-DD
+        function fmt(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${dd}`;
         }
+        const weekObj = {
+            weekNumber: w,
+            startDate: fmt(start),
+            endDate: fmt(end),
+            dateRange: `${new Date(start).toLocaleString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(end).toLocaleString('en-US', { month: 'short', day: 'numeric' })}`
+        };
+        weeks.push(weekObj);
+    }
+    return weeks;
+}
+
 
         // Check if a week has complete data (all 7 days)
         function checkWeekData(week, dailyData) {
