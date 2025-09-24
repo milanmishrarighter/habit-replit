@@ -1740,35 +1740,14 @@ async function initCloudFirst() {
 
 function showDropboxUnavailable(message) {
     window.DROPBOX_AVAILABLE = false;
-    let banner = document.getElementById('dropbox-unavailable-banner');
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'dropbox-unavailable-banner';
-        banner.style.position = 'fixed';
-        banner.style.top = '0';
-        banner.style.left = '0';
-        banner.style.right = '0';
-        banner.style.background = '#ffdddd';
-        banner.style.color = '#900';
-        banner.style.padding = '12px';
-        banner.style.zIndex = '9999';
-        banner.style.textAlign = 'center';
-        banner.style.fontWeight = '700';
-        document.body.appendChild(banner);
-    }
-    banner.textContent = 'Dropbox unavailable: ' + message + ' — the app is offline. Local storage is disabled by policy.';
-    // visually disable main UI if present
-    const container = document.querySelector('.container');
-    if (container) {
-        container.style.filter = 'grayscale(60%) blur(1px)';
-        container.style.pointerEvents = 'none';
-    }
+    console.warn('Dropbox unavailable:', message);
     const connBtn = document.getElementById('connection-status-btn');
     if (connBtn) {
         connBtn.textContent = '☁️ Unavailable';
         connBtn.style.backgroundColor = '#95a5a6';
         connBtn.title = 'Dropbox unavailable';
     }
+    // do not block UI or insert top banner; allow user to use existing connection buttons
 }
 
 // Neutralize localStorage.setItem to prevent writes (policy: never use localStorage)
@@ -5946,5 +5925,62 @@ function safeParseMaybe(objOrString, defaultVal) {
 
 
     </script>
+
+<!-- Dropbox Connect Modal -->
+<div id="dropbox-connect-modal" style="display:none; position:fixed; z-index:10000; left:0; top:0; right:0; bottom:0; align-items:center; justify-content:center; background: rgba(0,0,0,0.5);">
+  <div style="background:white; padding:20px; border-radius:12px; width:90%; max-width:420px; box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+    <h3 style="margin-top:0;">Connect to Dropbox</h3>
+    <p style="color:#333;">Paste a Dropbox access token (personal or generated) below to connect. This token will be kept only in memory for this session.</p>
+    <input id="dropbox-access-token-input" type="text" placeholder="Dropbox access token" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:12px;" />
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button id="dropbox-connect-cancel" style="padding:8px 12px; background:#95a5a6; color:white; border:none; border-radius:6px; cursor:pointer;">Cancel</button>
+      <button id="dropbox-connect-submit" style="padding:8px 12px; background:#3498db; color:white; border:none; border-radius:6px; cursor:pointer;">Connect</button>
+    </div>
+    <p id="dropbox-connect-error" style="color:#c0392b; display:none; margin-top:10px;"></p>
+  </div>
+</div>
+
+
+<script>
+}
+document.addEventListener('click', function(e){
+    if(e.target && e.target.id === 'dropbox-connect-cancel') closeConnectModal();
+    if(e.target && e.target.id === 'dropbox-connect-submit') connectWithToken();
+});
+
+).value;
+    const errEl = document.getElementById('dropbox-connect-error');
+    if (!token || token.trim().length < 5) {
+        if(errEl){ errEl.textContent = 'Please enter a valid access token.'; errEl.style.display = 'block'; }
+        return;
+    }
+    try {
+        // create Dropbox client in memory and test a small call
+        window.dbx = new Dropbox.Dropbox({ accessToken: token.trim() });
+        // mark authenticated flag
+        window.isAuthenticated = true;
+        // test by listing root folder metadata or getting account info
+        const acct = await window.dbx.usersGetCurrentAccount();
+        console.log('Dropbox account connected:', acct);
+        // close modal
+        closeConnectModal();
+        // re-run bootstrap loader to fetch data
+        if (typeof initCloudFirst === 'function') {
+            initCloudFirst();
+        } else if (typeof loadFromCloud === 'function') {
+            // fallback: try loading directly
+            await loadFromCloud();
+            document.dispatchEvent(new CustomEvent('cloudDataReady', { detail: window.CLOUD_DATA }));
+        }
+    } catch (err) {
+        console.error('Dropbox connect failed:', err);
+        if(errEl){ errEl.textContent = 'Connection failed. Check token and internet. ' + (err && err.error && err.error.error_summary ? err.error.error_summary : ''); errEl.style.display = 'block'; }
+        // reset auth
+        window.dbx = null;
+        window.isAuthenticated = false;
+    }
+}
+</script>
+
 </body>
 </html>
