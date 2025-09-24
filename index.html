@@ -1036,6 +1036,92 @@
             padding: 20px;
         }
 
+        .last-complete-week {
+            background: #e8f5e8;
+            border: 2px solid #27ae60;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .last-complete-week h3 {
+            margin: 0 0 5px 0;
+            color: #27ae60;
+            font-size: 18px;
+        }
+
+        .last-complete-week p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .weekly-fines-history {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .week-item {
+            border-bottom: 1px solid #eee;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .week-item:last-child {
+            border-bottom: none;
+        }
+
+        .week-info {
+            flex: 1;
+        }
+
+        .week-number {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .week-dates {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .week-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-complete {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .status-incomplete {
+            color: #e74c3c;
+            font-style: italic;
+        }
+
+        .status-no-data {
+            color: #95a5a6;
+            font-style: italic;
+        }
+
+        .fine-amount {
+            font-weight: bold;
+            color: #e74c3c;
+            font-size: 16px;
+        }
+
+        .fine-amount.zero {
+            color: #27ae60;
+        }
+
         .fines-section {
             margin-bottom: 40px;
         }
@@ -1684,28 +1770,16 @@
             <!-- Fines Tab -->
             <div id="fines" class="tab-pane">
                 <div class="fines-content">
-                    <h2>Fines</h2>
+                    <h2>Weekly Fines History</h2>
                     
-                    <!-- Committed Fines Section -->
-                    <div class="fines-section">
-                        <h3>Committed Fines</h3>
-                        <div class="committed-fines-list" id="committed-fines-list">
-                            <!-- Committed fines will be dynamically populated here -->
-                        </div>
-                        <div class="no-fines-message" id="no-committed-fines" style="display: none;">
-                            <p>🎉 No committed fines! Keep up the great work!</p>
-                        </div>
+                    <!-- Last Complete Week Display -->
+                    <div class="last-complete-week" id="last-complete-week">
+                        <!-- Last complete week will be dynamically populated here -->
                     </div>
                     
-                    <!-- Possible Fines Section -->
-                    <div class="fines-section">
-                        <h3>Possible Fines (Warnings)</h3>
-                        <div class="possible-fines-list" id="possible-fines-list">
-                            <!-- Possible fines will be dynamically populated here -->
-                        </div>
-                        <div class="no-warnings-message" id="no-possible-fines" style="display: none;">
-                            <p>✨ No upcoming fines! You're on track with all your habits!</p>
-                        </div>
+                    <!-- Weekly Fines History -->
+                    <div class="weekly-fines-history" id="weekly-fines-history">
+                        <!-- 52-week history will be dynamically populated here -->
                     </div>
                 </div>
             </div>
@@ -4954,12 +5028,211 @@
         }
 
         function loadFines() {
-            console.log('Loading fines...');
-            // First check and commit any immediate fines
-            checkAndCommitImmediateFines();
-            // Then display everything
-            displayCommittedFines();
-            displayPossibleWarnings();
+            console.log('=== Loading weekly fines history ===');
+            console.log('Checking containers...');
+            const lastCompleteContainer = document.getElementById('last-complete-week');
+            const historyContainer = document.getElementById('weekly-fines-history');
+            console.log('Last complete container:', lastCompleteContainer);
+            console.log('History container:', historyContainer);
+            generateWeeklyFinesHistory();
+        }
+
+        // Generate complete 52-week calendar for 2025
+        function generateWeeklyFinesHistory() {
+            const lastCompleteContainer = document.getElementById('last-complete-week');
+            const historyContainer = document.getElementById('weekly-fines-history');
+            
+            if (!lastCompleteContainer || !historyContainer) return;
+            
+            const year = 2025;
+            const weeks = generateYearWeeks(year);
+            const dailyData = getAllHabitTrackingData();
+            const habits = getHabitsSync();
+            
+            let lastCompleteWeek = null;
+            const weekResults = [];
+            
+            // Process each week
+            weeks.forEach(week => {
+                const weekData = checkWeekData(week, dailyData);
+                const fines = weekData.complete ? calculateWeekFines(week, dailyData, habits) : [];
+                
+                weekResults.push({
+                    ...week,
+                    ...weekData,
+                    fines: fines,
+                    totalFineAmount: fines.reduce((sum, fine) => sum + fine.amount, 0)
+                });
+                
+                // Track last complete week
+                if (weekData.complete) {
+                    lastCompleteWeek = weekResults[weekResults.length - 1];
+                }
+            });
+            
+            // Display last complete week
+            displayLastCompleteWeek(lastCompleteContainer, lastCompleteWeek);
+            
+            // Display weekly history (reverse order - most recent first)
+            displayWeeklyHistory(historyContainer, weekResults.reverse());
+        }
+
+        // Generate all 52 weeks of 2025 with proper Monday-Sunday ranges
+        function generateYearWeeks(year) {
+            const weeks = [];
+            
+            // Find first Monday of the year
+            const jan1 = new Date(year, 0, 1);
+            const firstMonday = new Date(jan1);
+            const dayOfWeek = jan1.getDay();
+            const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+            firstMonday.setDate(jan1.getDate() + daysUntilMonday);
+            
+            // Generate 52 weeks
+            for (let weekNum = 1; weekNum <= 52; weekNum++) {
+                const weekStart = new Date(firstMonday);
+                weekStart.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
+                
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 6);
+                
+                weeks.push({
+                    weekNumber: weekNum,
+                    startDate: new Date(weekStart),
+                    endDate: new Date(weekEnd),
+                    dateRange: `${formatDateShort(weekStart)} - ${formatDateShort(weekEnd)}`
+                });
+            }
+            
+            return weeks;
+        }
+
+        // Check if a week has complete data (all 7 days)
+        function checkWeekData(week, dailyData) {
+            const dates = [];
+            const currentDate = new Date(week.startDate);
+            
+            // Get all 7 days of the week
+            for (let i = 0; i < 7; i++) {
+                dates.push(formatDate(currentDate));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            // Check data existence
+            const existingDates = dates.filter(date => dailyData[date]);
+            const complete = existingDates.length === 7;
+            
+            return {
+                complete: complete,
+                daysWithData: existingDates.length,
+                totalDays: 7,
+                status: complete ? 'Complete' : existingDates.length > 0 ? `Partial (${existingDates.length}/7)` : 'No data'
+            };
+        }
+
+        // Calculate fines for a complete week
+        function calculateWeekFines(week, dailyData, habits) {
+            const fines = [];
+            const currentDate = new Date(week.startDate);
+            const weekDates = [];
+            
+            // Get all dates in the week
+            for (let i = 0; i < 7; i++) {
+                weekDates.push(formatDate(currentDate));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            habits.forEach(habit => {
+                if (!habit.frequencies || !habit.fineAmount) return;
+                
+                // Count tracking values for this week
+                const counts = {};
+                weekDates.forEach(date => {
+                    const dayData = dailyData[date];
+                    if (dayData && dayData[habit.id] && dayData[habit.id].selectedValue) {
+                        const value = dayData[habit.id].selectedValue;
+                        counts[value] = (counts[value] || 0) + 1;
+                    }
+                });
+                
+                // Check each frequency rule
+                habit.frequencies.forEach(freq => {
+                    if (freq.frequency === 'weekly') {
+                        const currentCount = counts[freq.trackingValue] || 0;
+                        const limit = freq.number;
+                        
+                        // Check if this is a negative tracking value (limit)
+                        const isNegativeTracking = ['no', 'fail', 'missed', 'bare minimum'].includes(freq.trackingValue);
+                        
+                        if (isNegativeTracking && currentCount > limit) {
+                            fines.push({
+                                habitName: habit.name,
+                                violation: `${currentCount}/${limit} ${freq.trackingValue}`,
+                                amount: habit.fineAmount,
+                                currency: '₹'
+                            });
+                        }
+                    }
+                });
+            });
+            
+            return fines;
+        }
+
+        // Display last complete week at the top
+        function displayLastCompleteWeek(container, lastCompleteWeek) {
+            if (!lastCompleteWeek) {
+                container.innerHTML = `
+                    <h3>No Complete Weeks Found</h3>
+                    <p>No weeks with all 7 days of data available yet.</p>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <h3>Last Complete Week: Week ${lastCompleteWeek.weekNumber}</h3>
+                <p>${lastCompleteWeek.dateRange} • Total Fines: ₹${lastCompleteWeek.totalFineAmount}</p>
+            `;
+        }
+
+        // Display weekly history
+        function displayWeeklyHistory(container, weekResults) {
+            const historyHtml = weekResults.map(week => {
+                const statusClass = week.complete ? 'status-complete' : 
+                                  week.daysWithData > 0 ? 'status-incomplete' : 'status-no-data';
+                
+                const fineDisplay = week.complete ? 
+                    (week.totalFineAmount > 0 ? `₹${week.totalFineAmount}` : '₹0') :
+                    '-';
+                
+                const fineClass = week.totalFineAmount > 0 ? 'fine-amount' : 'fine-amount zero';
+                
+                const fineDetails = week.fines.length > 0 ? 
+                    week.fines.map(fine => `${fine.habitName}: ${fine.violation}`).join(', ') : '';
+                
+                return `
+                    <div class="week-item">
+                        <div class="week-info">
+                            <div class="week-number">Week ${week.weekNumber}</div>
+                            <div class="week-dates">${week.dateRange}</div>
+                            ${fineDetails ? `<div class="week-dates" style="color: #e74c3c; margin-top: 4px;">${fineDetails}</div>` : ''}
+                        </div>
+                        <div class="week-status">
+                            <span class="${statusClass}">${week.status}</span>
+                            <span class="${fineClass}">${fineDisplay}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = historyHtml;
+        }
+
+        // Helper function to format dates short
+        function formatDateShort(date) {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${months[date.getMonth()]} ${date.getDate()}`;
         }
         
         function displayCommittedFines() {
