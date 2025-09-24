@@ -1762,6 +1762,46 @@ function filterHabitDataToExisting(habitDataObj, habits) {
 }
 </script>
 
+
+<script>
+// Rebuild dailyHabitTracking from journalEntries to ensure consistency and remove orphan IDs.
+// This will overwrite window.CLOUD_DATA.dailyHabitTracking in-memory but will NOT auto-sync to Dropbox.
+function rebuildDailyHabitTrackingFromJournalEntries() {
+    try {
+        if (!window.CLOUD_DATA) return;
+        const journal = window.CLOUD_DATA.journalEntries || {};
+        const habits = window.CLOUD_DATA.habits || [];
+        const validIds = new Set((habits || []).map(h=>String(h.id)));
+        const newDaily = {};
+        Object.keys(journal).forEach(date => {
+            const entry = journal[date];
+            if (entry && entry.habitData) {
+                const hd = {};
+                Object.keys(entry.habitData).forEach(hid => {
+                    if (validIds.has(String(hid))) {
+                        hd[hid] = entry.habitData[hid];
+                    } else {
+                        // skip unknown habit ids
+                        console.warn('rebuild: skipping unknown habit id', hid, 'on', date);
+                    }
+                });
+                if (Object.keys(hd).length > 0) {
+                    newDaily[date] = hd;
+                }
+            }
+        });
+        window.CLOUD_DATA.dailyHabitTracking = newDaily;
+        console.log('Rebuilt dailyHabitTracking from journalEntries. Dates:', Object.keys(newDaily).length);
+    } catch (e) {
+        console.error('rebuildDailyHabitTrackingFromJournalEntries error', e);
+    }
+}
+// Call on cloudDataReady event to sanitize on load
+document.addEventListener('cloudDataReady', function(){ 
+    try { rebuildDailyHabitTrackingFromJournalEntries(); } catch(e){ console.warn(e); }
+});
+</script>
+
 </head>
 <body>
     <div class="container">
@@ -2803,6 +2843,33 @@ function filterHabitDataToExisting(habitDataObj, habits) {
         async function saveEntry() {
 
     try {
+        // sanitize entry.habitData to only include current habits
+        const currentHabits = (typeof getHabitsSync==='function' ? getHabitsSync() : window.CLOUD_DATA && window.CLOUD_DATA.habits || []);
+        const validIds = new Set((currentHabits||[]).map(h=>String(h.id)));
+        if (typeof entry !== 'undefined' && entry && entry.habitData) {
+            const newHd = {};
+            Object.keys(entry.habitData).forEach(hid => {
+                if (validIds.has(String(hid))) newHd[hid] = entry.habitData[hid];
+                else console.warn('saveEntry: dropping unknown habit id', hid);
+            });
+            entry.habitData = newHd;
+        }
+        // When updating dailyHabitTracking for the date, REPLACE the day's object (do not merge with old/ghost ids)
+        if (typeof dailyHabitData !== 'undefined' && dailyHabitData) {
+            const newDailyHd = {};
+            Object.keys(dailyHabitData).forEach(hid => {
+                if (validIds.has(String(hid))) newDailyHd[hid] = dailyHabitData[hid];
+            });
+            // ensure CLOUD_DATA exists
+            if (!window.CLOUD_DATA) window.CLOUD_DATA = {};
+            if (!window.CLOUD_DATA.dailyHabitTracking) window.CLOUD_DATA.dailyHabitTracking = {};
+            // replace the day's tracking entirely
+            window.CLOUD_DATA.dailyHabitTracking[entryDate] = newDailyHd;
+        }
+    } catch(e) { console.warn('saveEntry sanitization error', e); }
+    
+
+    try {
         // If entry object exists in the function scope, filter its habitData
         if (typeof entry !== 'undefined' && entry && entry.habitData) {
             entry.habitData = filterHabitDataToExisting(entry.habitData, (typeof getHabitsSync === 'function' ? getHabitsSync() : window.CLOUD_DATA && window.CLOUD_DATA.habits || []));
@@ -3222,6 +3289,23 @@ function filterHabitDataToExisting(habitDataObj, habits) {
         }
 
         async function saveHabit() {
+
+    try {
+        // ensure habits array exists
+        if (!window.CLOUD_DATA) window.CLOUD_DATA = {};
+        if (!window.CLOUD_DATA.habits) window.CLOUD_DATA.habits = [];
+        // if habitObj exists, ensure id is string and unique
+        if (typeof habitObj !== 'undefined' && habitObj) {
+            habitObj.id = String(habitObj.id || Date.now());
+            // ensure uniqueness
+            const existing = (window.CLOUD_DATA.habits||[]).find(h=>String(h.id)===String(habitObj.id));
+            if (existing) {
+                // generate a new id if collision
+                habitObj.id = String(Date.now() + Math.floor(Math.random()*1000));
+            }
+        }
+    } catch(e){ console.warn('createHabit injection error', e); }
+    
             if (!validateHabitForm()) return;
             
             const habitData = {
