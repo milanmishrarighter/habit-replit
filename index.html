@@ -5067,12 +5067,25 @@
                 const weekData = checkWeekData(week, dailyData);
                 const fines = weekData.complete ? calculateWeekFines(week, dailyData, habits) : [];
                 
-                weekResults.push({
-                    ...week,
-                    ...weekData,
-                    fines: fines,
-                    totalFineAmount: fines.reduce((sum, fine) => sum + fine.amount, 0)
-                });
+                // Push a properly structured object
+        weekResults.push({
+            week: week,
+            weekNumber: week.weekNumber,
+            startDate: week.startDate,
+            endDate: week.endDate,
+            dateRange: week.dateRange,
+            complete: weekData.complete,
+            daysWithData: weekData.daysWithData,
+            totalDays: weekData.totalDays,
+            status: weekData.status,
+            fines: fines,
+            totalFineAmount: fines.reduce((sum, fine) => sum + (parseFloat(fine.amount) || 0), 0)
+        });
+
+        // Track last complete week
+        if (weekData.complete) {
+            lastCompleteWeek = weekResults[weekResults.length - 1];
+        }
                 
                 // Track last complete week
                 if (weekData.complete) {
