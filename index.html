@@ -1693,6 +1693,75 @@
             }
         }
     </style>
+
+<script>
+function getHabitById(habits, id) {
+    if (!habits || !Array.isArray(habits)) return null;
+    for (let i = 0; i < habits.length; i++) {
+        if (String(habits[i].id) === String(id)) return habits[i];
+    }
+    return null;
+}
+function filterEntryHabits(habitDataObj, habits) {
+    if (!habitDataObj) return [];
+    const result = [];
+    Object.keys(habitDataObj).forEach(hid => {
+        const h = getHabitById(habits, hid);
+        if (h) {
+            const val = habitDataObj[hid] && habitDataObj[hid].selectedValue ? habitDataObj[hid].selectedValue : null;
+            result.push({ id: hid, name: h.name || ('Habit ' + hid), selectedValue: val });
+        } else {
+            console.warn('Skipping orphan habit id in entry rendering:', hid);
+        }
+    });
+    return result;
+}
+// Remove references to a habit id from CLOUD_DATA in-memory (journalEntries and dailyHabitTracking)
+// Does not automatically sync; caller can call syncToCloud if desired.
+function removeHabitReferencesInCloud(habitId) {
+    try {
+        if (!window.CLOUD_DATA) return;
+        const jd = window.CLOUD_DATA.journalEntries || {};
+        Object.keys(jd).forEach(d => {
+            if (jd[d] && jd[d].habitData && jd[d].habitData[habitId]) {
+                delete jd[d].habitData[habitId];
+                // if habitData becomes empty, leave entry as-is (journal text may remain)
+            }
+        });
+        const dt = window.CLOUD_DATA.dailyHabitTracking || {};
+        Object.keys(dt).forEach(d => {
+            if (dt[d] && dt[d][habitId]) {
+                delete dt[d][habitId];
+            }
+        });
+        // write back
+        window.CLOUD_DATA.journalEntries = jd;
+        window.CLOUD_DATA.dailyHabitTracking = dt;
+        console.log('Removed habit references in CLOUD_DATA for id', habitId);
+    } catch (e) {
+        console.error('removeHabitReferencesInCloud error', e);
+    }
+}
+</script>
+
+<script>
+// Ensure habitData only contains current habit ids
+function filterHabitDataToExisting(habitDataObj, habits) {
+    if (!habitDataObj) return {};
+    const out = {};
+    const currentHabits = habits || (typeof getHabitsSync === 'function' ? getHabitsSync() : window.CLOUD_DATA && window.CLOUD_DATA.habits || []);
+    const ids = new Set(currentHabits.map(h=>String(h.id)));
+    Object.keys(habitDataObj).forEach(k=>{
+        if (ids.has(String(k))) {
+            out[k] = habitDataObj[k];
+        } else {
+            console.warn('Dropping unknown habit id from entry data during save:', k);
+        }
+    });
+    return out;
+}
+</script>
+
 </head>
 <body>
     <div class="container">
@@ -2732,6 +2801,19 @@
 
         // Save entry functionality with Dropbox cloud sync
         async function saveEntry() {
+
+    try {
+        // If entry object exists in the function scope, filter its habitData
+        if (typeof entry !== 'undefined' && entry && entry.habitData) {
+            entry.habitData = filterHabitDataToExisting(entry.habitData, (typeof getHabitsSync === 'function' ? getHabitsSync() : window.CLOUD_DATA && window.CLOUD_DATA.habits || []));
+        }
+        // Also ensure when saving dailyHabitTracking, we only write known ids
+        if (typeof dailyHabitData !== 'undefined' && dailyHabitData) {
+            // dailyHabitData is expected to be an object for the day's tracking
+            dailyHabitData = filterHabitDataToExisting(dailyHabitData, (typeof getHabitsSync === 'function' ? getHabitsSync() : window.CLOUD_DATA && window.CLOUD_DATA.habits || []));
+        }
+    } catch(e) { console.warn('saveEntry filter injection error', e); }
+    
             const date = document.getElementById('entry-date').value;
             const entry = document.getElementById('journal-entry').value;
             
@@ -3435,6 +3517,10 @@
         }
 
         async function deleteHabit(habitId) {
+    try { removeHabitReferencesInCloud(habitId); } catch(e) { console.warn('removeHabitReferencesInCloud failed', e); }
+
+    try { removeHabitReferencesInCloud(habitId); } catch(e) { console.warn("removeHabitReferencesInCloud failed", e); }
+
             const habits = await getHabits();
             const habit = habits.find(h => h.id === habitId);
             if (!habit) return;
