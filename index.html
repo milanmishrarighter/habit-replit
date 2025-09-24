@@ -1805,6 +1805,17 @@ if (window.CLOUD_DATA) {
 }
 </script>
 
+<script>
+function safeParseMaybe(objOrString, defaultVal) {
+    if (objOrString === null || objOrString === undefined) return defaultVal === undefined ? null : defaultVal;
+    if (typeof objOrString === 'string') {
+        try { return safeParseMaybe(objOrString); } catch (e) { return defaultVal === undefined ? null : defaultVal; }
+    }
+    return objOrString;
+}
+</script>
+
+
     <div class="container">
         <h1>Daily Journal & Habit Tracker</h1>
         
@@ -2501,7 +2512,7 @@ if (window.CLOUD_DATA) {
 
                 // Parse JSON safely
                 try {
-                    const parsed = JSON.parse(fileContent);
+                    const parsed = safeParseMaybe(fileContent);
                     console.log('Successfully parsed Dropbox file content (patched).');
                     return parsed;
                 } catch (e) {
@@ -2722,7 +2733,7 @@ if (window.CLOUD_DATA) {
             try {
                 const saved = localStorage.getItem('recentEmojis');
                 if (saved) {
-                    const parsed = JSON.parse(saved);
+                    const parsed = safeParseMaybe(saved);
                     // Validate that it's an array of strings
                     if (Array.isArray(parsed) && parsed.every(item => typeof item === 'string')) {
                         recentEmojis = parsed;
@@ -3385,7 +3396,7 @@ if (window.CLOUD_DATA) {
             // But NEVER overwrite existing localStorage data
             try {
                 const localHabits = (window.CLOUD_DATA && window.CLOUD_DATA['habits']);
-                habits = localHabits ? JSON.parse(localHabits) : [];
+                habits = localHabits ? safeParseMaybe(localHabits) : [];
                 console.log('Using localStorage habits (Dropbox unavailable):', habits);
             } catch (error) {
                 console.error('Error loading habits from localStorage:', error);
@@ -3827,7 +3838,7 @@ if (window.CLOUD_DATA) {
         function getDailyHabitData(date, habitId) {
             try {
                 const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
-                const allData = data ? JSON.parse(data) : {};
+                const allData = data ? safeParseMaybe(data) : {};
                 const dateData = allData[date] || {};
                 return dateData[habitId] || { selectedValue: null, outOfControlMiss: false };
             } catch (error) {
@@ -3838,7 +3849,7 @@ if (window.CLOUD_DATA) {
         async function saveDailyHabitData(date, habitId, selectedValue, outOfControlMiss) {
             try {
                 const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
-                const allData = data ? JSON.parse(data) : {};
+                const allData = data ? safeParseMaybe(data) : {};
                 
                 if (!allData[date]) {
                     allData[date] = {};
@@ -3868,7 +3879,7 @@ if (window.CLOUD_DATA) {
         function getAllDailyHabitData(date) {
             try {
                 const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
-                const allData = data ? JSON.parse(data) : {};
+                const allData = data ? safeParseMaybe(data) : {};
                 return allData[date] || {};
             } catch (error) {
                 return {};
@@ -3877,14 +3888,22 @@ if (window.CLOUD_DATA) {
         
         // Get all habit tracking data (for period calculations)
         function getAllHabitTrackingData() {
-            try {
-                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
-                return data ? JSON.parse(data) : {};
-            } catch (error) {
-                console.error('Error loading all habit tracking data:', error);
-                return {};
-            }
+    try {
+        if (!window.DROPBOX_AVAILABLE) {
+            console.warn('Dropbox unavailable when requesting habit tracking data.');
+            return null;
         }
+        const dt = window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking'];
+        if (!dt) {
+            console.warn('No dailyHabitTracking present in CLOUD_DATA.');
+            return null;
+        }
+        return dt;
+    } catch (e) {
+        console.error('getAllHabitTrackingData (patched) error:', e);
+        return null;
+    }
+}
 
         // Update habits when date changes
         document.addEventListener('DOMContentLoaded', function() {
@@ -4076,7 +4095,7 @@ if (window.CLOUD_DATA) {
         function getHabitsSync() {
             try {
                 const habits = (window.CLOUD_DATA && window.CLOUD_DATA['habits']);
-                return habits ? JSON.parse(habits) : [];
+                return habits ? safeParseMaybe(habits) : [];
             } catch (error) {
                 return [];
             }
@@ -4818,7 +4837,7 @@ if (window.CLOUD_DATA) {
         // Fine storage and management functions
         function getFines() {
             try {
-                return JSON.parse(localStorage.getItem('fines') || '[]');
+                return safeParseMaybe(localStorage.getItem('fines') || '[]');
             } catch (error) {
                 console.error('Error loading fines:', error);
                 return [];
@@ -4903,7 +4922,7 @@ if (window.CLOUD_DATA) {
                 return [];
             }
             
-            const entries = JSON.parse(localStorage.getItem('entries') || '[]');
+            const entries = safeParseMaybe(localStorage.getItem('entries') || '[]');
             const dateIndex = buildDateIndex(entries);
             const today = new Date();
             const warnings = [];
@@ -5098,7 +5117,7 @@ if (window.CLOUD_DATA) {
 
         // Get effective limit considering out-of-control passes used
         function getEffectiveLimit(habitId, ruleValue, baseLimit, periodId, frequency) {
-            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
+            const oocUsage = safeParseMaybe(localStorage.getItem('oocUsage') || '{}');
             const periodUsage = oocUsage[periodId] || {};
             const habitUsage = periodUsage[habitId] || {};
             
@@ -5109,7 +5128,7 @@ if (window.CLOUD_DATA) {
         // Generate and get all fines based on habit violations
         function getFines() {
             const habits = getHabitsSync();
-            const entries = JSON.parse(localStorage.getItem('entries') || '[]');
+            const entries = safeParseMaybe(localStorage.getItem('entries') || '[]');
             const dateIndex = buildDateIndex(entries);
             
             const lastWeek = findLastCompletedWeek(dateIndex);
@@ -5166,7 +5185,7 @@ if (window.CLOUD_DATA) {
             });
             
             // Merge with saved fines from localStorage
-            const savedFines = JSON.parse(localStorage.getItem('fines') || '[]');
+            const savedFines = safeParseMaybe(localStorage.getItem('fines') || '[]');
             const allFines = [...savedFines];
             
             // Add new generated fines if they don't already exist
@@ -5485,7 +5504,7 @@ if (window.CLOUD_DATA) {
 
         // Update fine status function
         function updateFineStatus(fineId, newStatus) {
-            const fines = JSON.parse(localStorage.getItem('fines') || '[]');
+            const fines = safeParseMaybe(localStorage.getItem('fines') || '[]');
             const fineIndex = fines.findIndex(f => f.id === fineId);
             
             if (fineIndex !== -1) {
@@ -5512,7 +5531,7 @@ if (window.CLOUD_DATA) {
             const currentMonthId = getMonthId(new Date(today.getFullYear(), today.getMonth(), 1));
             const periodId = frequency === 'weekly' ? currentWeekId : currentMonthId;
             
-            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
+            const oocUsage = safeParseMaybe(localStorage.getItem('oocUsage') || '{}');
             const periodUsage = oocUsage[periodId] || {};
             const habitUsage = periodUsage[habitId] || {};
             
@@ -5532,7 +5551,7 @@ if (window.CLOUD_DATA) {
             const currentMonthId = getMonthId(new Date(today.getFullYear(), today.getMonth(), 1));
             const periodId = frequency === 'weekly' ? currentWeekId : currentMonthId;
             
-            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
+            const oocUsage = safeParseMaybe(localStorage.getItem('oocUsage') || '{}');
             if (!oocUsage[periodId]) oocUsage[periodId] = {};
             if (!oocUsage[periodId][habitId]) oocUsage[periodId][habitId] = {};
             
