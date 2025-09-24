@@ -1740,35 +1740,15 @@ async function initCloudFirst() {
 
 function showDropboxUnavailable(message) {
     window.DROPBOX_AVAILABLE = false;
-    let banner = document.getElementById('dropbox-unavailable-banner');
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'dropbox-unavailable-banner';
-        banner.style.position = 'fixed';
-        banner.style.top = '0';
-        banner.style.left = '0';
-        banner.style.right = '0';
-        banner.style.background = '#ffdddd';
-        banner.style.color = '#900';
-        banner.style.padding = '12px';
-        banner.style.zIndex = '9999';
-        banner.style.textAlign = 'center';
-        banner.style.fontWeight = '700';
-        document.body.appendChild(banner);
-    }
-    banner.textContent = 'Dropbox unavailable: ' + message + ' — the app is offline. Local storage is disabled by policy.';
-    // visually disable main UI if present
-    const container = document.querySelector('.container');
-    if (container) {
-        container.style.filter = 'grayscale(60%) blur(1px)';
-        container.style.pointerEvents = 'none';
-    }
+    console.warn('Dropbox unavailable:', message);
+    // Update connection-status UI if present, but DO NOT disable the rest of the UI or inject a banner.
     const connBtn = document.getElementById('connection-status-btn');
     if (connBtn) {
         connBtn.textContent = '☁️ Unavailable';
         connBtn.style.backgroundColor = '#95a5a6';
         connBtn.title = 'Dropbox unavailable';
     }
+    // intentionally do not modify container styles or create banners
 }
 
 // Neutralize localStorage.setItem to prevent writes (policy: never use localStorage)
