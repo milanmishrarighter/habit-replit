@@ -5114,21 +5114,48 @@
                 console.log('Week 38 data check result:', weekData);
             }
             
+            
             let lastCompleteWeek = null;
             const weekResults = [];
-            
-            // Process each week
+
+            // Determine latest week with data from dailyData keys (dailyData keys are dates like YYYY-MM-DD)
+            const dataDates = Object.keys(dailyData).filter(d => !!d);
+            let latestWeekNumber = 0;
+            if (dataDates.length > 0) {
+                const parsed = dataDates.map(d => new Date(d + 'T00:00:00'));
+                const latestDate = new Date(Math.max.apply(null, parsed));
+                // find the week object that contains latestDate
+                const latestWeekObj = weeks.find(w => {
+                    const s = new Date(w.startDate + 'T00:00:00');
+                    const e = new Date(w.endDate + 'T23:59:59');
+                    return latestDate >= s && latestDate <= e;
+                });
+                if (latestWeekObj) latestWeekNumber = latestWeekObj.weekNumber;
+            }
+
+            // If no data found, fall back to showing all weeks (or none). We'll show all past weeks up to current week.
+            if (latestWeekNumber === 0) {
+                // find current week based on today's date
+                const today = new Date();
+                const currentWeekObj = weeks.find(w => {
+                    const s = new Date(w.startDate + 'T00:00:00');
+                    const e = new Date(w.endDate + 'T23:59:59');
+                    return today >= s && today <= e;
+                });
+                latestWeekNumber = currentWeekObj ? currentWeekObj.weekNumber : weeks[weeks.length - 1].weekNumber;
+            }
+
+            // Only process weeks up to the latestWeekNumber
             weeks.forEach(week => {
+                if (week.weekNumber > latestWeekNumber) return; // skip future weeks
                 const weekData = checkWeekData(week, dailyData);
                 const fines = weekData.complete ? calculateWeekFines(week, dailyData, habits) : [];
-                
-                weekResults.push({
-                    ...week,
-                    ...weekData,
-                    fines: fines,
-                    totalFineAmount: fines.reduce((sum, fine) => sum + fine.amount, 0)
-                });
-                
+
+                // ensure fine amounts are numbers
+                const totalFineAmount = fines.reduce((sum, fine) => sum + (parseFloat(fine.amount) || 0), 0);
+
+                weekResults.push(Object.assign({}, week, weekData, { fines: fines, totalFineAmount }));
+
                 // Track last complete week
                 if (weekData.complete) {
                     lastCompleteWeek = weekResults[weekResults.length - 1];
@@ -5137,10 +5164,10 @@
             
             // Display last complete week
             displayLastCompleteWeek(lastCompleteContainer, lastCompleteWeek);
-            
+
             // Display weekly history (reverse order - most recent first)
             displayWeeklyHistory(historyContainer, weekResults.reverse());
-        }
+}
 
         // Generate all 52 weeks of 2025 with proper Monday-Sunday ranges
         function generateYearWeeks(year) {
