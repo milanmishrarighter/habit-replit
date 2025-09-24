@@ -2331,38 +2331,35 @@
             }
         }
 
-        
-async function loadFromCloud() {
+        async function loadFromCloud() {
             if (!isAuthenticated || !dbx) return null;
-
+            
             try {
+                // Attempt to download the JSON file from Dropbox
                 const response = await dbx.filesDownload({ path: '/habit-tracker-data.json' });
-                console.log('Dropbox response:', response);
+                console.log('Dropbox response (patched):', response);
 
-                // Normalize different SDK shapes (some SDKs return { result: { fileBlob } }, others return { fileBinary } or top-level fileBinary)
                 let fileContent = null;
 
-                // Case: response.result exists (modern Dropbox SDK)
+                // Modern SDK: response.result.fileBlob
                 if (response && response.result) {
                     const res = response.result;
                     if (res.fileBlob && typeof res.fileBlob.text === 'function') {
                         fileContent = await res.fileBlob.text();
                     } else if (res.fileBinary) {
-                        // fileBinary might already be a string or an ArrayBuffer/Uint8Array
                         if (typeof res.fileBinary === 'string') {
                             fileContent = res.fileBinary;
                         } else if (res.fileBinary instanceof Blob && typeof res.fileBinary.text === 'function') {
                             fileContent = await res.fileBinary.text();
                         } else if (res.fileBinary instanceof Uint8Array) {
-                            // decode utf-8
                             fileContent = new TextDecoder().decode(res.fileBinary);
                         }
-                    } else if (res.fileBlob === undefined && typeof res === 'string') {
+                    } else if (typeof res === 'string') {
                         fileContent = res;
                     }
                 }
 
-                // Case: older SDK or different shape where fileBinary is top-level
+                // Older shape: top-level fileBinary
                 if (!fileContent && response && response.fileBinary) {
                     if (typeof response.fileBinary === 'string') {
                         fileContent = response.fileBinary;
@@ -2373,39 +2370,40 @@ async function loadFromCloud() {
                     }
                 }
 
-                // Last resort: stringify response.result or response
+                // If still nothing, attempt to extract from response.fileBlob (some SDKs)
+                if (!fileContent && response && typeof response.fileBlob !== 'undefined') {
+                    try {
+                        if (typeof response.fileBlob.text === 'function') {
+                            fileContent = await response.fileBlob.text();
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+
+                // Last-resort: stringify result
                 if (!fileContent) {
-                    if (response && response.result) {
-                        try { fileContent = JSON.stringify(response.result); } catch (e) { fileContent = null; }
-                    } else {
-                        try { fileContent = JSON.stringify(response); } catch (e) { fileContent = null; }
-                    }
+                    try { fileContent = JSON.stringify(response.result || response); } catch (e) { fileContent = null; }
                 }
 
                 if (!fileContent) {
-                    console.warn('Could not extract file content from Dropbox response.');
+                    console.warn('Could not extract file content from Dropbox response (patched).');
                     return null;
                 }
 
-                console.log('Successfully loaded data from Dropbox');
-                return JSON.parse(fileContent);
+                // Parse JSON safely
+                try {
+                    const parsed = JSON.parse(fileContent);
+                    console.log('Successfully parsed Dropbox file content (patched).');
+                    return parsed;
+                } catch (e) {
+                    console.error('Failed to parse Dropbox file content as JSON (patched):', e);
+                    return null;
+                }
             } catch (error) {
                 if (error && (error.status === 409 || (error.error_summary && error.error_summary.includes('not_found')))) {
-                    // File doesn't exist yet, which is fine for first time users
-                    console.log('Dropbox file not found - this is normal for first-time users.');
+                    console.log('Dropbox file not found - this is normal for first-time users (patched).');
                     return null;
                 }
                 console.error('Error loading from cloud (patched):', error);
-                return null;
-            }
-        }
- catch (error) {
-                if (error.status === 409 || error.error_summary?.includes('not_found')) {
-                    // File doesn't exist yet, which is fine for first time users
-                    console.log('Dropbox file not found - this is normal for first time users');
-                    return null;
-                }
-                console.error('Error loading from cloud:', error);
                 return null;
             }
         }
