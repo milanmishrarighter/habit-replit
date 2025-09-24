@@ -3949,10 +3949,7 @@
         }
 
         // Fines Functionality
-        function loadFines() {
-            calculateCommittedFines();
-            calculatePossibleFines();
-        }
+        // Old loadFines function removed - using new weekly system
 
         function calculateCommittedFines() {
             const habits = getHabitsSync();
@@ -5048,6 +5045,19 @@
             const weeks = generateYearWeeks(year);
             const dailyData = getAllHabitTrackingData();
             const habits = getHabitsSync();
+            
+            console.log('=== DEBUGGING DATA ===');
+            console.log('Daily data keys:', Object.keys(dailyData));
+            console.log('Habits loaded:', habits);
+            console.log('Week 38 check (Sep 22-28):');
+            
+            // Debug Week 38 specifically
+            const week38 = weeks.find(w => w.weekNumber === 38);
+            if (week38) {
+                console.log('Week 38 date range:', week38);
+                const weekData = checkWeekData(week38, dailyData);
+                console.log('Week 38 data check result:', weekData);
+            }
             
             let lastCompleteWeek = null;
             const weekResults = [];
