@@ -5273,7 +5273,14 @@ function generateWeeklyFinesHistory() {
 
     // get data safely (the app should be providing object, but guard against strings)
     let dailyData = getAllHabitTrackingData();
-    if (!dailyData) dailyData = {};
+    
+    // If no daily tracking data, show empty state and return early to avoid rendering hard-coded weeks.
+    if (!dailyData || Object.keys(dailyData).length === 0) {
+        lastCompleteContainer.innerHTML = `<h3>No Data Available</h3><p>No weekly habit tracking data found in the loaded JSON.</p>`;
+        historyContainer.innerHTML = `<div class=\"no-fines-message\"><p>No weekly data to display.</p></div>`;
+        return;
+    }
+if (!dailyData) dailyData = {};
     if (typeof dailyData === 'string') {
         try { dailyData = JSON.parse(dailyData); } catch (e) { console.warn('dailyData is string but not JSON', e); dailyData = {}; }
     }
