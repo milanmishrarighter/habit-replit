@@ -2314,19 +2314,66 @@
 
         // Cloud sync functions
         async function syncToCloud(data) {
-            if (!isAuthenticated || !dbx) return false;
-            
+            if (!isAuthenticated || !dbx) {
+                console.warn('syncToCloud aborted: not authenticated');
+                return false;
+            }
+
             try {
+                // Basic safety checks - refuse to overwrite with empty data
+                const hasEntries = data && (
+                    (data.journalEntries && Object.keys(data.journalEntries).length > 0) ||
+                    (data.dailyHabitTracking && Object.keys(data.dailyHabitTracking).length > 0) ||
+                    (data.habits && Array.isArray(data.habits) && data.habits.length > 0)
+                );
+                if (!hasEntries) {
+                    console.warn('syncToCloud aborted: data appears empty. Upload prevented to avoid accidental overwrite.');
+                    return false;
+                }
+
+                // Before overwriting, attempt to backup current remote file (store a copy under /backups/)
+                try {
+                    const existing = await dbx.filesDownload({ path: '/habit-tracker-data.json' });
+                    let existingText = null;
+                    if (existing && existing.result) {
+                        if (existing.result.fileBlob && typeof existing.result.fileBlob.text === 'function') {
+                            existingText = await existing.result.fileBlob.text();
+                        } else if (existing.result.fileBinary) {
+                            existingText = typeof existing.result.fileBinary === 'string' ? existing.result.fileBinary : String(existing.result.fileBinary);
+                        }
+                    }
+                    if (existingText) {
+                        const backupPath = `/backups/habit-tracker-data-${Date.now()}.json`;
+                        try {
+                            await dbx.filesUpload({
+                                path: backupPath,
+                                contents: existingText,
+                                mode: { '.tag': 'add' },
+                                autorename: true
+                            });
+                            console.log('Backup of remote file saved to', backupPath);
+                        } catch (bkErr) {
+                            console.warn('Failed to create remote backup before overwrite:', bkErr);
+                        }
+                    }
+                } catch (dlErr) {
+                    // No existing file or couldn't download - proceed cautiously
+                    console.warn('Could not download existing remote file for backup (may be missing)', dlErr);
+                }
+
+                // Now upload the new content with overwrite mode
                 const fileContent = JSON.stringify(data, null, 2);
                 await dbx.filesUpload({
                     path: '/habit-tracker-data.json',
                     contents: fileContent,
-                    mode: 'overwrite',
-                    autorename: true
+                    mode: { '.tag': 'overwrite' },
+                    autorename: false
                 });
+
+                console.log('syncToCloud: upload successful');
                 return true;
-            } catch (error) {
-                console.error('Error syncing to cloud:', error);
+            } catch (err) {
+                console.error('syncToCloud error (safe patch):', err);
                 return false;
             }
         }
@@ -5090,84 +5137,103 @@
         }
 
         // Generate complete 52-week calendar for 2025
-        function generateWeeklyFinesHistory() {
-            const lastCompleteContainer = document.getElementById('last-complete-week');
-            const historyContainer = document.getElementById('weekly-fines-history');
-            
-            if (!lastCompleteContainer || !historyContainer) return;
-            
-            const year = 2025;
-            const weeks = generateYearWeeks(year);
-            const dailyData = getAllHabitTrackingData();
-            const habits = getHabitsSync();
-            
-            console.log('=== DEBUGGING DATA ===');
-            console.log('Daily data keys:', Object.keys(dailyData));
-            console.log('Habits loaded:', habits);
-            console.log('Week 38 check (Sep 22-28):');
-            
-            // Debug Week 38 specifically
-            const week38 = weeks.find(w => w.weekNumber === 38);
-            if (week38) {
-                console.log('Week 38 date range:', week38);
-                const weekData = checkWeekData(week38, dailyData);
-                console.log('Week 38 data check result:', weekData);
+        
+function generateWeeklyFinesHistory() {
+    const lastCompleteContainer = document.getElementById('last-complete-week');
+    const historyContainer = document.getElementById('weekly-fines-history');
+    if (!lastCompleteContainer || !historyContainer) return;
+
+    const year = 2025;
+    const weeks = generateYearWeeks(year);
+
+    // get data safely (the app should be providing object, but guard against strings)
+    let dailyData = getAllHabitTrackingData();
+    if (!dailyData) dailyData = {};
+    if (typeof dailyData === 'string') {
+        try { dailyData = JSON.parse(dailyData); } catch (e) { console.warn('dailyData is string but not JSON', e); dailyData = {}; }
+    }
+
+    const habits = (typeof getHabitsSync === 'function') ? getHabitsSync() : (window.habits || []);
+
+    // Determine last date available in the json (keys like 'YYYY-MM-DD')
+    const dateKeys = Object.keys(dailyData).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+    if (dateKeys.length === 0) {
+        // No dates at all — show only a placeholder up to current week (but per spec we won't show future weeks)
+        lastCompleteContainer.innerHTML = `<h3>No Data Available</h3><p>The JSON contains no journal/habit dates yet.</p>`;
+        historyContainer.innerHTML = `<div class="no-fines-message"><p>No weekly data to display.</p></div>`;
+        return;
+    }
+
+    const lastDateStr = dateKeys[dateKeys.length - 1];
+    const lastDate = new Date(lastDateStr + 'T00:00:00');
+
+    // find the week that contains the lastDate
+    let latestWeekNumber = 0;
+    for (const w of weeks) {
+        const s = new Date(w.startDate);
+        const e = new Date(w.endDate);
+        s.setHours(0,0,0,0);
+        e.setHours(23,59,59,999);
+        if (lastDate >= s && lastDate <= e) {
+            latestWeekNumber = w.weekNumber;
+            break;
+        }
+    }
+
+    // If couldn't find (edge cases) - fallback to the last week in the year that is <= lastDate
+    if (latestWeekNumber === 0) {
+        for (let i = weeks.length - 1; i >= 0; i--) {
+            const w = weeks[i];
+            const s = new Date(w.startDate);
+            const e = new Date(w.endDate);
+            s.setHours(0,0,0,0);
+            e.setHours(23,59,59,999);
+            if (lastDate >= s) { latestWeekNumber = w.weekNumber; break; }
+        }
+    }
+
+    // Build results only up to the latestWeekNumber (inclusive)
+    let lastCompleteWeek = null;
+    const weekResults = [];
+
+    for (const week of weeks) {
+        if (latestWeekNumber && week.weekNumber > latestWeekNumber) break;
+
+        const weekData = checkWeekData(week, dailyData);
+        let fines = [];
+        if (weekData.complete) {
+            try {
+                fines = calculateWeekFines(week, dailyData, habits) || [];
+            } catch (e) {
+                console.error('Error calculating fines for week', week.weekNumber, e);
+                fines = [];
             }
-            
-            
-            let lastCompleteWeek = null;
-            const weekResults = [];
+        }
 
-            // Determine latest week with data from dailyData keys (dailyData keys are dates like YYYY-MM-DD)
-            const dataDates = Object.keys(dailyData).filter(d => !!d);
-            let latestWeekNumber = 0;
-            if (dataDates.length > 0) {
-                const parsed = dataDates.map(d => new Date(d + 'T00:00:00'));
-                const latestDate = new Date(Math.max.apply(null, parsed));
-                // find the week object that contains latestDate
-                const latestWeekObj = weeks.find(w => {
-                    const s = new Date(w.startDate + 'T00:00:00');
-                    const e = new Date(w.endDate + 'T23:59:59');
-                    return latestDate >= s && latestDate <= e;
-                });
-                if (latestWeekObj) latestWeekNumber = latestWeekObj.weekNumber;
-            }
+        // Normalize numeric fine amounts
+        const normalizedFines = fines.map(f => {
+            const amount = (typeof f.amount === 'number') ? f.amount : parseFloat(String(f.amount || '').replace(/[^\d.-]/g, '')) || 0;
+            return Object.assign({}, f, { amount: amount });
+        });
 
-            // If no data found, fall back to showing all weeks (or none). We'll show all past weeks up to current week.
-            if (latestWeekNumber === 0) {
-                // find current week based on today's date
-                const today = new Date();
-                const currentWeekObj = weeks.find(w => {
-                    const s = new Date(w.startDate + 'T00:00:00');
-                    const e = new Date(w.endDate + 'T23:59:59');
-                    return today >= s && today <= e;
-                });
-                latestWeekNumber = currentWeekObj ? currentWeekObj.weekNumber : weeks[weeks.length - 1].weekNumber;
-            }
+        const totalFineAmount = normalizedFines.reduce((sum, fx) => sum + (fx.amount || 0), 0);
 
-            // Only process weeks up to the latestWeekNumber
-            weeks.forEach(week => {
-                if (week.weekNumber > latestWeekNumber) return; // skip future weeks
-                const weekData = checkWeekData(week, dailyData);
-                const fines = weekData.complete ? calculateWeekFines(week, dailyData, habits) : [];
+        weekResults.push(Object.assign({}, week, weekData, { fines: normalizedFines, totalFineAmount }));
 
-                // ensure fine amounts are numbers
-                const totalFineAmount = fines.reduce((sum, fine) => sum + (parseFloat(fine.amount) || 0), 0);
+        if (weekData.complete) lastCompleteWeek = weekResults[weekResults.length - 1];
+    }
 
-                weekResults.push(Object.assign({}, week, weekData, { fines: fines, totalFineAmount }));
+    // Display last complete week (or a friendly message if none)
+    if (!lastCompleteWeek) {
+        lastCompleteContainer.innerHTML = `<h3>No Complete Weeks Found</h3><p>No weeks with all 7 days of data available up to ${lastDateStr}.</p>`;
+    } else {
+        displayLastCompleteWeek(lastCompleteContainer, lastCompleteWeek);
+    }
 
-                // Track last complete week
-                if (weekData.complete) {
-                    lastCompleteWeek = weekResults[weekResults.length - 1];
-                }
-            });
-            
-            // Display last complete week
-            displayLastCompleteWeek(lastCompleteContainer, lastCompleteWeek);
-
-            // Display weekly history (reverse order - most recent first)
-            displayWeeklyHistory(historyContainer, weekResults.reverse());
+    // Display weekly history (reverse order - most recent first)
+    displayWeeklyHistory(historyContainer, weekResults.reverse());
 }
+
 
         // Generate all 52 weeks of 2025 with proper Monday-Sunday ranges
         function generateYearWeeks(year) {
