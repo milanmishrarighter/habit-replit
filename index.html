@@ -2861,7 +2861,8 @@ document.addEventListener('cloudDataReady', function(){
                 if (validIds.has(String(hid))) newDailyHd[hid] = dailyHabitData[hid];
             });
             // ensure CLOUD_DATA exists
-            if (!window.CLOUD_DATA) window.CLOUD_DATA = {};
+            if (!window.CLOUD_DATA) /* removed embedded demo JSON to avoid hard-coded data; CLOUD_DATA must be loaded from Dropbox */
+window.CLOUD_DATA = window.CLOUD_DATA || null;
             if (!window.CLOUD_DATA.dailyHabitTracking) window.CLOUD_DATA.dailyHabitTracking = {};
             // replace the day's tracking entirely
             window.CLOUD_DATA.dailyHabitTracking[entryDate] = newDailyHd;
@@ -3292,7 +3293,8 @@ document.addEventListener('cloudDataReady', function(){
 
     try {
         // ensure habits array exists
-        if (!window.CLOUD_DATA) window.CLOUD_DATA = {};
+        if (!window.CLOUD_DATA) /* removed embedded demo JSON to avoid hard-coded data; CLOUD_DATA must be loaded from Dropbox */
+window.CLOUD_DATA = window.CLOUD_DATA || null;
         if (!window.CLOUD_DATA.habits) window.CLOUD_DATA.habits = [];
         // if habitObj exists, ensure id is string and unique
         if (typeof habitObj !== 'undefined' && habitObj) {
