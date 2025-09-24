@@ -1695,96 +1695,6 @@
     </style>
 </head>
 <body>
-
-<script>
-// BOOTSTRAP: Ensure app uses Dropbox as single source of truth.
-// This runs early and blocks rendering of tabs until cloud data is loaded.
-window.CLOUD_DATA = null;
-window.DROPBOX_AVAILABLE = false;
-
-async function initCloudFirst() {
-    try {
-        if (typeof loadFromCloud !== 'function') {
-            console.error('loadFromCloud not available.'); 
-            showDropboxUnavailable('Dropbox loader missing.');
-            return;
-        }
-        const data = await loadFromCloud();
-        if (!data) {
-            showDropboxUnavailable('Dropbox returned no data.');
-            return;
-        }
-        window.CLOUD_DATA = data;
-        window.DROPBOX_AVAILABLE = true;
-        console.log('CLOUD_DATA loaded (bootstrap):', window.CLOUD_DATA);
-
-        // Update connection-status UI if present
-        const connBtn = document.getElementById('connection-status-btn');
-        if (connBtn) {
-            connBtn.textContent = '☁️ Connected (Dropbox)';
-            connBtn.style.backgroundColor = '#27ae60';
-            connBtn.title = 'Connected to Dropbox';
-        }
-
-        // Remove any existing unavailable banner
-        const existing = document.getElementById('dropbox-unavailable-banner');
-        if (existing) existing.remove();
-
-        // Fire an event so other parts of the app can react
-        document.dispatchEvent(new CustomEvent('cloudDataReady', { detail: window.CLOUD_DATA }));
-    } catch (err) {
-        console.error('initCloudFirst error:', err);
-        showDropboxUnavailable('Error connecting to Dropbox.');
-    }
-}
-
-function showDropboxUnavailable(message) {
-    window.DROPBOX_AVAILABLE = false;
-    console.warn('Dropbox unavailable:', message);
-    // Update connection-status UI if present, but DO NOT disable the rest of the UI or inject a banner.
-    const connBtn = document.getElementById('connection-status-btn');
-    if (connBtn) {
-        connBtn.textContent = '☁️ Unavailable';
-        connBtn.style.backgroundColor = '#95a5a6';
-        connBtn.title = 'Dropbox unavailable';
-    }
-    // intentionally do not modify container styles or create banners
-}
-
-// Neutralize localStorage.setItem to prevent writes (policy: never use localStorage)
-(function disableLocalStorageWrites(){
-    try {
-        const origSet = localStorage.setItem;
-        localStorage.setItem = function(){ console.warn('localStorage.setItem blocked by policy.'); };
-    } catch(e){
-        // ignore (some environments may restrict overriding)
-    }
-})();
-
-// Start bootstrapping once DOM is ready enough
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCloudFirst);
-} else {
-    initCloudFirst();
-}
-</script>
-
-
-<script>
-function getCloudOrThrow(key, defaultVal) {
-    if (!window.DROPBOX_AVAILABLE) {
-        throw new Error('DROPBOX_UNAVAILABLE');
-    }
-    if (!window.CLOUD_DATA) return defaultVal === undefined ? null : defaultVal;
-    return window.CLOUD_DATA[key] !== undefined ? window.CLOUD_DATA[key] : (defaultVal === undefined ? null : defaultVal);
-}
-
-// Fire an event when cloud data is ready (if already ready)
-if (window.CLOUD_DATA) {
-    document.dispatchEvent(new CustomEvent('cloudDataReady', { detail: window.CLOUD_DATA }));
-}
-</script>
-
     <div class="container">
         <h1>Daily Journal & Habit Tracker</h1>
         
@@ -2361,7 +2271,7 @@ if (window.CLOUD_DATA) {
                 
                 if (accessToken) {
                     dropboxAccessToken = accessToken;
-                    /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                    localStorage.setItem('dropboxAccessToken', accessToken);
                     isAuthenticated = true;
                     dbx = new Dropbox.Dropbox({ accessToken: accessToken });
                     
@@ -2572,10 +2482,10 @@ if (window.CLOUD_DATA) {
             try {
                 // Collect all local data
                 const allData = {
-                    journalEntries: (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {},
-                    habits: (window.CLOUD_DATA && window.CLOUD_DATA['habits']) || [],
-                    finesStatus: (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {},
-                    dailyHabitTracking: (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {},
+                    journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
+                    habits: JSON.parse(localStorage.getItem('habits') || '[]'),
+                    finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                    dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
                     lastSync: new Date().toISOString()
                 };
                 
@@ -2617,10 +2527,10 @@ if (window.CLOUD_DATA) {
             
             try {
                 const allData = {
-                    journalEntries: (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {},
-                    habits: (window.CLOUD_DATA && window.CLOUD_DATA['habits']) || [],
-                    finesStatus: (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {},
-                    dailyHabitTracking: (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {},
+                    journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
+                    habits: JSON.parse(localStorage.getItem('habits') || '[]'),
+                    finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                    dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
                     lastSync: new Date().toISOString()
                 };
                 
@@ -2676,7 +2586,7 @@ if (window.CLOUD_DATA) {
         // Enhanced save functions that include live sync
         async function saveDataWithSync(key, data) {
             // Always save to localStorage as backup
-            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+            localStorage.setItem(key, JSON.stringify(data));
             
             // Trigger live sync immediately
             await triggerLiveSync(`${key} saved`);
@@ -2785,7 +2695,7 @@ if (window.CLOUD_DATA) {
             recentEmojis = recentEmojis.slice(0, 5);
             
             // Save to localStorage
-            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+            localStorage.setItem('recentEmojis', JSON.stringify(recentEmojis));
             
             // Re-render the UI
             renderRecentEmojis();
@@ -2841,7 +2751,7 @@ if (window.CLOUD_DATA) {
             }
             
             // Check if entry already exists for this date
-            const entries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
+            const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
             const existingEntry = entries[date];
             
             if (existingEntry) {
@@ -2864,7 +2774,7 @@ if (window.CLOUD_DATA) {
             const habitData = getAllDailyHabitData(date);
             
             // Save to localStorage and sync to cloud
-            const entries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
+            const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
             entries[date] = {
                 text: entry,
                 emoji: emoji,
@@ -2948,14 +2858,14 @@ if (window.CLOUD_DATA) {
         // localStorage backup functions
         function saveEntryToLocalStorage(date, entry, emoji, habitData) {
             try {
-                const entries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
+                const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
                 entries[date] = {
                     text: entry,
                     emoji: emoji,
                     habitData: habitData,
                     timestamp: new Date().toISOString()
                 };
-                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                localStorage.setItem('journalEntries', JSON.stringify(entries));
             } catch (error) {
                 console.error('Error saving to localStorage:', error);
             }
@@ -2963,7 +2873,7 @@ if (window.CLOUD_DATA) {
 
         function loadEntryFromLocalStorage(date) {
             try {
-                const entries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
+                const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
                 return entries[date] || null;
             } catch (error) {
                 console.error('Error loading from localStorage:', error);
@@ -2983,9 +2893,9 @@ if (window.CLOUD_DATA) {
                         entry = cloudData.journalEntries[date];
                         console.log('Loaded entry from Dropbox:', entry);
                         // Update localStorage with fresh data from Dropbox
-                        const allEntries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
+                        const allEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
                         allEntries[date] = entry;
-                        /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                        localStorage.setItem('journalEntries', JSON.stringify(allEntries));
                     }
                 } catch (error) {
                     console.error('Error loading entry from Dropbox:', error);
@@ -3351,8 +3261,7 @@ if (window.CLOUD_DATA) {
                         habits = cloudData.habits;
                         console.log('Loaded habits from Dropbox:', habits);
                         // Update localStorage with fresh data from Dropbox
-                        /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
-                        if (cloudData && cloudData.dailyHabitTracking) { /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled'); }
+                        localStorage.setItem('habits', JSON.stringify(habits));
                         return habits;
                     }
                 } catch (error) {
@@ -3364,7 +3273,7 @@ if (window.CLOUD_DATA) {
             // FALLBACK: Only use localStorage if Dropbox fails
             // But NEVER overwrite existing localStorage data
             try {
-                const localHabits = (window.CLOUD_DATA && window.CLOUD_DATA['habits']);
+                const localHabits = localStorage.getItem('habits');
                 habits = localHabits ? JSON.parse(localHabits) : [];
                 console.log('Using localStorage habits (Dropbox unavailable):', habits);
             } catch (error) {
@@ -3383,9 +3292,9 @@ if (window.CLOUD_DATA) {
             if (isAuthenticated && dbx) {
                 try {
                     const allData = {
-                        journalEntries: (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {},
+                        journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
                         habits: habits,
-                        finesStatus: (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {},
+                        finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
                         lastSync: new Date().toISOString()
                     };
                     const syncSuccess = await syncToCloud(allData);
@@ -3806,7 +3715,7 @@ if (window.CLOUD_DATA) {
 
         function getDailyHabitData(date, habitId) {
             try {
-                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
+                const data = localStorage.getItem('dailyHabitTracking');
                 const allData = data ? JSON.parse(data) : {};
                 const dateData = allData[date] || {};
                 return dateData[habitId] || { selectedValue: null, outOfControlMiss: false };
@@ -3817,7 +3726,7 @@ if (window.CLOUD_DATA) {
 
         async function saveDailyHabitData(date, habitId, selectedValue, outOfControlMiss) {
             try {
-                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
+                const data = localStorage.getItem('dailyHabitTracking');
                 const allData = data ? JSON.parse(data) : {};
                 
                 if (!allData[date]) {
@@ -3836,7 +3745,7 @@ if (window.CLOUD_DATA) {
                     allData[date][habitId].outOfControlMiss = outOfControlMiss;
                 }
 
-                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                localStorage.setItem('dailyHabitTracking', JSON.stringify(allData));
                 
                 // Trigger live sync for daily habit tracking
                 await triggerLiveSync('Daily habit tracking updated');
@@ -3847,7 +3756,7 @@ if (window.CLOUD_DATA) {
 
         function getAllDailyHabitData(date) {
             try {
-                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
+                const data = localStorage.getItem('dailyHabitTracking');
                 const allData = data ? JSON.parse(data) : {};
                 return allData[date] || {};
             } catch (error) {
@@ -3858,7 +3767,7 @@ if (window.CLOUD_DATA) {
         // Get all habit tracking data (for period calculations)
         function getAllHabitTrackingData() {
             try {
-                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
+                const data = localStorage.getItem('dailyHabitTracking');
                 return data ? JSON.parse(data) : {};
             } catch (error) {
                 console.error('Error loading all habit tracking data:', error);
@@ -3925,9 +3834,7 @@ if (window.CLOUD_DATA) {
                             });
                         }
                         // Update localStorage with fresh data from Dropbox
-                        /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
-                        
-                        if (cloudData.dailyHabitTracking) { /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled'); }if (cloudData.dailyHabitTracking) { /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled'); }
+                        localStorage.setItem('journalEntries', JSON.stringify(cloudData.journalEntries));
                         
                         // Sort entries by date (newest first) and return early
                         entries.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -3942,7 +3849,7 @@ if (window.CLOUD_DATA) {
             // FALLBACK: Only use localStorage if Dropbox fails
             // But NEVER overwrite existing localStorage data
             try {
-                const journalEntries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
+                const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
                 console.log('Using localStorage entries (Dropbox unavailable):', journalEntries);
                 for (const [date, entry] of Object.entries(journalEntries)) {
                     entries.push({
@@ -4055,7 +3962,7 @@ if (window.CLOUD_DATA) {
 
         function getHabitsSync() {
             try {
-                const habits = (window.CLOUD_DATA && window.CLOUD_DATA['habits']);
+                const habits = localStorage.getItem('habits');
                 return habits ? JSON.parse(habits) : [];
             } catch (error) {
                 return [];
@@ -4070,17 +3977,17 @@ if (window.CLOUD_DATA) {
 
             try {
                 // Remove from localStorage
-                const journalEntries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
+                const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
                 delete journalEntries[dateString];
-                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
 
                 // Sync to cloud if connected
                 if (isAuthenticated && dbx) {
                     const allData = {
                         journalEntries: journalEntries,
-                        habits: (window.CLOUD_DATA && window.CLOUD_DATA['habits']) || [],
-                        finesStatus: (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {},
-                        dailyHabitTracking: (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {},
+                        habits: JSON.parse(localStorage.getItem('habits') || '[]'),
+                        finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                        dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
                         lastSync: new Date().toISOString()
                     };
                     await syncToCloud(allData);
@@ -4310,7 +4217,7 @@ if (window.CLOUD_DATA) {
 
         function countHabitInPeriod(habitId, startDate, endDate, trackingValue) {
             let count = 0;
-            const journalEntries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
+            const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
             
             for (const [date, entry] of Object.entries(journalEntries)) {
                 const entryDate = new Date(date);
@@ -4408,7 +4315,7 @@ if (window.CLOUD_DATA) {
                 savedFines.push({ id: fineId, isPaid: isPaid });
             }
             
-            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+            localStorage.setItem('finesStatus', JSON.stringify(savedFines));
             
             // Refresh the fines display
             loadFines();
@@ -4416,7 +4323,7 @@ if (window.CLOUD_DATA) {
 
         function getSavedFines() {
             try {
-                return (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {};
+                return JSON.parse(localStorage.getItem('finesStatus') || '[]');
             } catch (error) {
                 return [];
             }
@@ -4807,7 +4714,7 @@ if (window.CLOUD_DATA) {
         
         function saveFines(fines) {
             try {
-                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                localStorage.setItem('fines', JSON.stringify(fines));
                 triggerLiveSync('Fines updated');
             } catch (error) {
                 console.error('Error saving fines:', error);
@@ -5157,7 +5064,7 @@ if (window.CLOUD_DATA) {
             });
             
             // Save updated fines
-            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+            localStorage.setItem('fines', JSON.stringify(allFines));
             
             return allFines;
         }
@@ -5183,93 +5090,84 @@ if (window.CLOUD_DATA) {
         }
 
         // Generate complete 52-week calendar for 2025
-        
-function generateWeeklyFinesHistory() {
-    const lastCompleteContainer = document.getElementById('last-complete-week');
-    const historyContainer = document.getElementById('weekly-fines-history');
+        function generateWeeklyFinesHistory() {
+            const lastCompleteContainer = document.getElementById('last-complete-week');
+            const historyContainer = document.getElementById('weekly-fines-history');
+            
+            if (!lastCompleteContainer || !historyContainer) return;
+            
+            const year = 2025;
+            const weeks = generateYearWeeks(year);
+            const dailyData = getAllHabitTrackingData();
+            const habits = getHabitsSync();
+            
+            console.log('=== DEBUGGING DATA ===');
+            console.log('Daily data keys:', Object.keys(dailyData));
+            console.log('Habits loaded:', habits);
+            console.log('Week 38 check (Sep 22-28):');
+            
+            // Debug Week 38 specifically
+            const week38 = weeks.find(w => w.weekNumber === 38);
+            if (week38) {
+                console.log('Week 38 date range:', week38);
+                const weekData = checkWeekData(week38, dailyData);
+                console.log('Week 38 data check result:', weekData);
+            }
+            
+            
+            let lastCompleteWeek = null;
+            const weekResults = [];
 
-    if (!lastCompleteContainer || !historyContainer) return;
+            // Determine latest week with data from dailyData keys (dailyData keys are dates like YYYY-MM-DD)
+            const dataDates = Object.keys(dailyData).filter(d => !!d);
+            let latestWeekNumber = 0;
+            if (dataDates.length > 0) {
+                const parsed = dataDates.map(d => new Date(d + 'T00:00:00'));
+                const latestDate = new Date(Math.max.apply(null, parsed));
+                // find the week object that contains latestDate
+                const latestWeekObj = weeks.find(w => {
+                    const s = new Date(w.startDate + 'T00:00:00');
+                    const e = new Date(w.endDate + 'T23:59:59');
+                    return latestDate >= s && latestDate <= e;
+                });
+                if (latestWeekObj) latestWeekNumber = latestWeekObj.weekNumber;
+            }
 
-    const year = 2025;
-    const weeks = generateYearWeeks(year);
-    const dailyData = getAllHabitTrackingData() || {};
-    const habits = getHabitsSync() || [];
+            // If no data found, fall back to showing all weeks (or none). We'll show all past weeks up to current week.
+            if (latestWeekNumber === 0) {
+                // find current week based on today's date
+                const today = new Date();
+                const currentWeekObj = weeks.find(w => {
+                    const s = new Date(w.startDate + 'T00:00:00');
+                    const e = new Date(w.endDate + 'T23:59:59');
+                    return today >= s && today <= e;
+                });
+                latestWeekNumber = currentWeekObj ? currentWeekObj.weekNumber : weeks[weeks.length - 1].weekNumber;
+            }
 
-    console.log('=== DEBUGGING DATA ===');
-    console.log('Daily data keys:', Object.keys(dailyData));
-    console.log('Habits loaded:', habits);
+            // Only process weeks up to the latestWeekNumber
+            weeks.forEach(week => {
+                if (week.weekNumber > latestWeekNumber) return; // skip future weeks
+                const weekData = checkWeekData(week, dailyData);
+                const fines = weekData.complete ? calculateWeekFines(week, dailyData, habits) : [];
 
-    // Find the latest date present in dailyData (keys are YYYY-MM-DD)
-    const dataDateKeys = Object.keys(dailyData).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
-    if (dataDateKeys.length === 0) {
-        // No data at all -> show empty state up to current week (but per spec, show weeks up to last date only, so none)
-        displayLastCompleteWeek(lastCompleteContainer, null);
-        displayWeeklyHistory(historyContainer, []);
-        return;
-    }
+                // ensure fine amounts are numbers
+                const totalFineAmount = fines.reduce((sum, fine) => sum + (parseFloat(fine.amount) || 0), 0);
 
-    // parse and find the latest chronological date
-    const latestDateStr = dataDateKeys.reduce((latest, cur) => {
-        return cur > latest ? cur : latest;
-    }, dataDateKeys[0]);
-    const latestDate = new Date(latestDateStr + 'T00:00:00');
+                weekResults.push(Object.assign({}, week, weekData, { fines: fines, totalFineAmount }));
 
-    // Find the week that contains the latestDate
-    let latestWeekNumber = 0;
-    for (const w of weeks) {
-        const s = new Date(w.startDate);
-        s.setHours(0,0,0,0);
-        const e = new Date(w.endDate);
-        e.setHours(23,59,59,999);
-        if (latestDate >= s && latestDate <= e) {
-            latestWeekNumber = w.weekNumber;
-            break;
-        }
-    }
-    // If not found (edge cases), set to most recent week that starts before latestDate
-    if (latestWeekNumber === 0) {
-        for (let i = weeks.length - 1; i >= 0; i--) {
-            const s = new Date(weeks[i].startDate); s.setHours(0,0,0,0);
-            if (latestDate >= s) { latestWeekNumber = weeks[i].weekNumber; break; }
-        }
-    }
+                // Track last complete week
+                if (weekData.complete) {
+                    lastCompleteWeek = weekResults[weekResults.length - 1];
+                }
+            });
+            
+            // Display last complete week
+            displayLastCompleteWeek(lastCompleteContainer, lastCompleteWeek);
 
-    // Build results for weeks up to latestWeekNumber only
-    let lastCompleteWeek = null;
-    const weekResults = [];
-
-    for (const week of weeks) {
-        if (week.weekNumber > latestWeekNumber) {
-            // per requirement: do not show weeks after last date found in the JSON
-            break;
-        }
-
-        const weekData = checkWeekData(week, dailyData);
-        let fines = [];
-        if (weekData.complete) {
-            fines = calculateWeekFines(week, dailyData, habits) || [];
-        }
-
-        // normalize fines amounts to numbers
-        const totalFineAmount = fines.reduce((sum, fine) => {
-            const amt = typeof fine.amount === 'string' ? parseFloat(fine.amount.replace(/[^\d.-]/g,'')) : Number(fine.amount || 0);
-            return sum + (isNaN(amt) ? 0 : amt);
-        }, 0);
-
-        weekResults.push(Object.assign({}, week, weekData, { fines: fines, totalFineAmount }));
-
-        if (weekData.complete) {
-            lastCompleteWeek = weekResults[weekResults.length - 1];
-        }
-    }
-
-    // Display last complete week (if any)
-    displayLastCompleteWeek(lastCompleteContainer, lastCompleteWeek);
-
-    // Display weekly history (most recent first)
-    displayWeeklyHistory(historyContainer, weekResults.slice().reverse());
+            // Display weekly history (reverse order - most recent first)
+            displayWeeklyHistory(historyContainer, weekResults.reverse());
 }
-
 
         // Generate all 52 weeks of 2025 with proper Monday-Sunday ranges
         function generateYearWeeks(year) {
@@ -5479,7 +5377,7 @@ function generateWeeklyFinesHistory() {
             
             if (fineIndex !== -1) {
                 fines[fineIndex].status = newStatus;
-                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                localStorage.setItem('fines', JSON.stringify(fines));
                 
                 // Trigger sync if available
                 if (isAuthenticated && dbx) {
@@ -5531,7 +5429,7 @@ function generateWeeklyFinesHistory() {
                 oocUsage[periodId][habitId].monthUsed = (oocUsage[periodId][habitId].monthUsed || 0) + 1;
             }
             
-            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+            localStorage.setItem('oocUsage', JSON.stringify(oocUsage));
             
             // Trigger sync if available
             if (isAuthenticated && dbx) {
@@ -5767,7 +5665,7 @@ function generateWeeklyFinesHistory() {
             if (!habit || !goal) return { achieved: 0, percentage: 0 };
             
             const currentYear = new Date().getFullYear();
-            const dailyTracking = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {};
+            const dailyTracking = JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}');
             
             let achieved = 0;
             
@@ -5796,7 +5694,7 @@ function generateWeeklyFinesHistory() {
         // Calculate weekly streaks for habits
         function calculateWeeklyStreaks(habits) {
             const streakData = [];
-            const dailyTracking = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {};
+            const dailyTracking = JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}');
             
             habits.forEach(habit => {
                 if (habit.frequency !== 'weekly') return;
