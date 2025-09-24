@@ -1736,7 +1736,7 @@ function removeHabitReferencesInCloud(habitId) {
         });
         // write back
         window.CLOUD_DATA.journalEntries = jd;
-        window.CLOUD_DATA.dailyHabitTracking = dt;
+        // removed write to CLOUD_DATA.dailyHabitTracking; now derived from journalEntries
         console.log('Removed habit references in CLOUD_DATA for id', habitId);
     } catch (e) {
         console.error('removeHabitReferencesInCloud error', e);
@@ -1790,7 +1790,7 @@ function rebuildDailyHabitTrackingFromJournalEntries() {
                 }
             }
         });
-        window.CLOUD_DATA.dailyHabitTracking = newDaily;
+        // removed write to CLOUD_DATA.dailyHabitTracking; now derived from journalEntries
         console.log('Rebuilt dailyHabitTracking from journalEntries. Dates:', Object.keys(newDaily).length);
     } catch (e) {
         console.error('rebuildDailyHabitTrackingFromJournalEntries error', e);
@@ -2863,7 +2863,7 @@ document.addEventListener('cloudDataReady', function(){
             // ensure CLOUD_DATA exists
             if (!window.CLOUD_DATA) /* removed embedded demo JSON to avoid hard-coded data; CLOUD_DATA must be loaded from Dropbox */
 window.CLOUD_DATA = window.CLOUD_DATA || null;
-            if (!window.CLOUD_DATA.dailyHabitTracking) window.CLOUD_DATA.dailyHabitTracking = {};
+            if (!window.CLOUD_DATA.dailyHabitTracking) // removed write to CLOUD_DATA.dailyHabitTracking; now derived from journalEntries
             // replace the day's tracking entirely
             window.CLOUD_DATA.dailyHabitTracking[entryDate] = newDailyHd;
         }
@@ -3917,7 +3917,7 @@ window.CLOUD_DATA = window.CLOUD_DATA || null;
                     allData[date][habitId].outOfControlMiss = outOfControlMiss;
                 }
 
-                localStorage.setItem('dailyHabitTracking', JSON.stringify(allData));
+                // removed localStorage write to dailyHabitTracking (now derived from journalEntries);
                 
                 // Trigger live sync for daily habit tracking
                 await triggerLiveSync('Daily habit tracking updated');
