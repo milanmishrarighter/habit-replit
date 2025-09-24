@@ -1740,14 +1740,35 @@ async function initCloudFirst() {
 
 function showDropboxUnavailable(message) {
     window.DROPBOX_AVAILABLE = false;
-    console.warn('Dropbox unavailable:', message);
+    let banner = document.getElementById('dropbox-unavailable-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'dropbox-unavailable-banner';
+        banner.style.position = 'fixed';
+        banner.style.top = '0';
+        banner.style.left = '0';
+        banner.style.right = '0';
+        banner.style.background = '#ffdddd';
+        banner.style.color = '#900';
+        banner.style.padding = '12px';
+        banner.style.zIndex = '9999';
+        banner.style.textAlign = 'center';
+        banner.style.fontWeight = '700';
+        document.body.appendChild(banner);
+    }
+    banner.textContent = 'Dropbox unavailable: ' + message + ' — the app is offline. Local storage is disabled by policy.';
+    // visually disable main UI if present
+    const container = document.querySelector('.container');
+    if (container) {
+        container.style.filter = 'grayscale(60%) blur(1px)';
+        container.style.pointerEvents = 'none';
+    }
     const connBtn = document.getElementById('connection-status-btn');
     if (connBtn) {
         connBtn.textContent = '☁️ Unavailable';
         connBtn.style.backgroundColor = '#95a5a6';
         connBtn.title = 'Dropbox unavailable';
     }
-    // do not block UI or insert top banner; allow user to use existing connection buttons
 }
 
 // Neutralize localStorage.setItem to prevent writes (policy: never use localStorage)
@@ -1783,17 +1804,6 @@ if (window.CLOUD_DATA) {
     document.dispatchEvent(new CustomEvent('cloudDataReady', { detail: window.CLOUD_DATA }));
 }
 </script>
-
-<script>
-function safeParseMaybe(objOrString, defaultVal) {
-    if (objOrString === null || objOrString === undefined) return defaultVal === undefined ? null : defaultVal;
-    if (typeof objOrString === 'string') {
-        try { return safeParseMaybe(objOrString); } catch (e) { return defaultVal === undefined ? null : defaultVal; }
-    }
-    return objOrString;
-}
-</script>
-
 
     <div class="container">
         <h1>Daily Journal & Habit Tracker</h1>
@@ -2491,7 +2501,7 @@ function safeParseMaybe(objOrString, defaultVal) {
 
                 // Parse JSON safely
                 try {
-                    const parsed = safeParseMaybe(fileContent);
+                    const parsed = JSON.parse(fileContent);
                     console.log('Successfully parsed Dropbox file content (patched).');
                     return parsed;
                 } catch (e) {
@@ -2712,7 +2722,7 @@ function safeParseMaybe(objOrString, defaultVal) {
             try {
                 const saved = localStorage.getItem('recentEmojis');
                 if (saved) {
-                    const parsed = safeParseMaybe(saved);
+                    const parsed = JSON.parse(saved);
                     // Validate that it's an array of strings
                     if (Array.isArray(parsed) && parsed.every(item => typeof item === 'string')) {
                         recentEmojis = parsed;
@@ -3375,7 +3385,7 @@ function safeParseMaybe(objOrString, defaultVal) {
             // But NEVER overwrite existing localStorage data
             try {
                 const localHabits = (window.CLOUD_DATA && window.CLOUD_DATA['habits']);
-                habits = localHabits ? safeParseMaybe(localHabits) : [];
+                habits = localHabits ? JSON.parse(localHabits) : [];
                 console.log('Using localStorage habits (Dropbox unavailable):', habits);
             } catch (error) {
                 console.error('Error loading habits from localStorage:', error);
@@ -3817,7 +3827,7 @@ function safeParseMaybe(objOrString, defaultVal) {
         function getDailyHabitData(date, habitId) {
             try {
                 const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
-                const allData = data ? safeParseMaybe(data) : {};
+                const allData = data ? JSON.parse(data) : {};
                 const dateData = allData[date] || {};
                 return dateData[habitId] || { selectedValue: null, outOfControlMiss: false };
             } catch (error) {
@@ -3828,7 +3838,7 @@ function safeParseMaybe(objOrString, defaultVal) {
         async function saveDailyHabitData(date, habitId, selectedValue, outOfControlMiss) {
             try {
                 const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
-                const allData = data ? safeParseMaybe(data) : {};
+                const allData = data ? JSON.parse(data) : {};
                 
                 if (!allData[date]) {
                     allData[date] = {};
@@ -3858,7 +3868,7 @@ function safeParseMaybe(objOrString, defaultVal) {
         function getAllDailyHabitData(date) {
             try {
                 const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
-                const allData = data ? safeParseMaybe(data) : {};
+                const allData = data ? JSON.parse(data) : {};
                 return allData[date] || {};
             } catch (error) {
                 return {};
@@ -3867,22 +3877,14 @@ function safeParseMaybe(objOrString, defaultVal) {
         
         // Get all habit tracking data (for period calculations)
         function getAllHabitTrackingData() {
-    try {
-        if (!window.DROPBOX_AVAILABLE) {
-            console.warn('Dropbox unavailable when requesting habit tracking data.');
-            return null;
+            try {
+                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
+                return data ? JSON.parse(data) : {};
+            } catch (error) {
+                console.error('Error loading all habit tracking data:', error);
+                return {};
+            }
         }
-        const dt = window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking'];
-        if (!dt) {
-            console.warn('No dailyHabitTracking present in CLOUD_DATA.');
-            return null;
-        }
-        return dt;
-    } catch (e) {
-        console.error('getAllHabitTrackingData (patched) error:', e);
-        return null;
-    }
-}
 
         // Update habits when date changes
         document.addEventListener('DOMContentLoaded', function() {
@@ -4074,7 +4076,7 @@ function safeParseMaybe(objOrString, defaultVal) {
         function getHabitsSync() {
             try {
                 const habits = (window.CLOUD_DATA && window.CLOUD_DATA['habits']);
-                return habits ? safeParseMaybe(habits) : [];
+                return habits ? JSON.parse(habits) : [];
             } catch (error) {
                 return [];
             }
@@ -4816,7 +4818,7 @@ function safeParseMaybe(objOrString, defaultVal) {
         // Fine storage and management functions
         function getFines() {
             try {
-                return safeParseMaybe(localStorage.getItem('fines') || '[]');
+                return JSON.parse(localStorage.getItem('fines') || '[]');
             } catch (error) {
                 console.error('Error loading fines:', error);
                 return [];
@@ -4901,7 +4903,7 @@ function safeParseMaybe(objOrString, defaultVal) {
                 return [];
             }
             
-            const entries = safeParseMaybe(localStorage.getItem('entries') || '[]');
+            const entries = JSON.parse(localStorage.getItem('entries') || '[]');
             const dateIndex = buildDateIndex(entries);
             const today = new Date();
             const warnings = [];
@@ -5096,7 +5098,7 @@ function safeParseMaybe(objOrString, defaultVal) {
 
         // Get effective limit considering out-of-control passes used
         function getEffectiveLimit(habitId, ruleValue, baseLimit, periodId, frequency) {
-            const oocUsage = safeParseMaybe(localStorage.getItem('oocUsage') || '{}');
+            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
             const periodUsage = oocUsage[periodId] || {};
             const habitUsage = periodUsage[habitId] || {};
             
@@ -5107,7 +5109,7 @@ function safeParseMaybe(objOrString, defaultVal) {
         // Generate and get all fines based on habit violations
         function getFines() {
             const habits = getHabitsSync();
-            const entries = safeParseMaybe(localStorage.getItem('entries') || '[]');
+            const entries = JSON.parse(localStorage.getItem('entries') || '[]');
             const dateIndex = buildDateIndex(entries);
             
             const lastWeek = findLastCompletedWeek(dateIndex);
@@ -5164,7 +5166,7 @@ function safeParseMaybe(objOrString, defaultVal) {
             });
             
             // Merge with saved fines from localStorage
-            const savedFines = safeParseMaybe(localStorage.getItem('fines') || '[]');
+            const savedFines = JSON.parse(localStorage.getItem('fines') || '[]');
             const allFines = [...savedFines];
             
             // Add new generated fines if they don't already exist
@@ -5201,84 +5203,93 @@ function safeParseMaybe(objOrString, defaultVal) {
         }
 
         // Generate complete 52-week calendar for 2025
-        function generateWeeklyFinesHistory() {
-            const lastCompleteContainer = document.getElementById('last-complete-week');
-            const historyContainer = document.getElementById('weekly-fines-history');
-            
-            if (!lastCompleteContainer || !historyContainer) return;
-            
-            const year = 2025;
-            const weeks = generateYearWeeks(year);
-            const dailyData = getAllHabitTrackingData();
-            const habits = getHabitsSync();
-            
-            console.log('=== DEBUGGING DATA ===');
-            console.log('Daily data keys:', Object.keys(dailyData));
-            console.log('Habits loaded:', habits);
-            console.log('Week 38 check (Sep 22-28):');
-            
-            // Debug Week 38 specifically
-            const week38 = weeks.find(w => w.weekNumber === 38);
-            if (week38) {
-                console.log('Week 38 date range:', week38);
-                const weekData = checkWeekData(week38, dailyData);
-                console.log('Week 38 data check result:', weekData);
-            }
-            
-            
-            let lastCompleteWeek = null;
-            const weekResults = [];
+        
+function generateWeeklyFinesHistory() {
+    const lastCompleteContainer = document.getElementById('last-complete-week');
+    const historyContainer = document.getElementById('weekly-fines-history');
 
-            // Determine latest week with data from dailyData keys (dailyData keys are dates like YYYY-MM-DD)
-            const dataDates = Object.keys(dailyData).filter(d => !!d);
-            let latestWeekNumber = 0;
-            if (dataDates.length > 0) {
-                const parsed = dataDates.map(d => new Date(d + 'T00:00:00'));
-                const latestDate = new Date(Math.max.apply(null, parsed));
-                // find the week object that contains latestDate
-                const latestWeekObj = weeks.find(w => {
-                    const s = new Date(w.startDate + 'T00:00:00');
-                    const e = new Date(w.endDate + 'T23:59:59');
-                    return latestDate >= s && latestDate <= e;
-                });
-                if (latestWeekObj) latestWeekNumber = latestWeekObj.weekNumber;
-            }
+    if (!lastCompleteContainer || !historyContainer) return;
 
-            // If no data found, fall back to showing all weeks (or none). We'll show all past weeks up to current week.
-            if (latestWeekNumber === 0) {
-                // find current week based on today's date
-                const today = new Date();
-                const currentWeekObj = weeks.find(w => {
-                    const s = new Date(w.startDate + 'T00:00:00');
-                    const e = new Date(w.endDate + 'T23:59:59');
-                    return today >= s && today <= e;
-                });
-                latestWeekNumber = currentWeekObj ? currentWeekObj.weekNumber : weeks[weeks.length - 1].weekNumber;
-            }
+    const year = 2025;
+    const weeks = generateYearWeeks(year);
+    const dailyData = getAllHabitTrackingData() || {};
+    const habits = getHabitsSync() || [];
 
-            // Only process weeks up to the latestWeekNumber
-            weeks.forEach(week => {
-                if (week.weekNumber > latestWeekNumber) return; // skip future weeks
-                const weekData = checkWeekData(week, dailyData);
-                const fines = weekData.complete ? calculateWeekFines(week, dailyData, habits) : [];
+    console.log('=== DEBUGGING DATA ===');
+    console.log('Daily data keys:', Object.keys(dailyData));
+    console.log('Habits loaded:', habits);
 
-                // ensure fine amounts are numbers
-                const totalFineAmount = fines.reduce((sum, fine) => sum + (parseFloat(fine.amount) || 0), 0);
+    // Find the latest date present in dailyData (keys are YYYY-MM-DD)
+    const dataDateKeys = Object.keys(dailyData).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+    if (dataDateKeys.length === 0) {
+        // No data at all -> show empty state up to current week (but per spec, show weeks up to last date only, so none)
+        displayLastCompleteWeek(lastCompleteContainer, null);
+        displayWeeklyHistory(historyContainer, []);
+        return;
+    }
 
-                weekResults.push(Object.assign({}, week, weekData, { fines: fines, totalFineAmount }));
+    // parse and find the latest chronological date
+    const latestDateStr = dataDateKeys.reduce((latest, cur) => {
+        return cur > latest ? cur : latest;
+    }, dataDateKeys[0]);
+    const latestDate = new Date(latestDateStr + 'T00:00:00');
 
-                // Track last complete week
-                if (weekData.complete) {
-                    lastCompleteWeek = weekResults[weekResults.length - 1];
-                }
-            });
-            
-            // Display last complete week
-            displayLastCompleteWeek(lastCompleteContainer, lastCompleteWeek);
+    // Find the week that contains the latestDate
+    let latestWeekNumber = 0;
+    for (const w of weeks) {
+        const s = new Date(w.startDate);
+        s.setHours(0,0,0,0);
+        const e = new Date(w.endDate);
+        e.setHours(23,59,59,999);
+        if (latestDate >= s && latestDate <= e) {
+            latestWeekNumber = w.weekNumber;
+            break;
+        }
+    }
+    // If not found (edge cases), set to most recent week that starts before latestDate
+    if (latestWeekNumber === 0) {
+        for (let i = weeks.length - 1; i >= 0; i--) {
+            const s = new Date(weeks[i].startDate); s.setHours(0,0,0,0);
+            if (latestDate >= s) { latestWeekNumber = weeks[i].weekNumber; break; }
+        }
+    }
 
-            // Display weekly history (reverse order - most recent first)
-            displayWeeklyHistory(historyContainer, weekResults.reverse());
+    // Build results for weeks up to latestWeekNumber only
+    let lastCompleteWeek = null;
+    const weekResults = [];
+
+    for (const week of weeks) {
+        if (week.weekNumber > latestWeekNumber) {
+            // per requirement: do not show weeks after last date found in the JSON
+            break;
+        }
+
+        const weekData = checkWeekData(week, dailyData);
+        let fines = [];
+        if (weekData.complete) {
+            fines = calculateWeekFines(week, dailyData, habits) || [];
+        }
+
+        // normalize fines amounts to numbers
+        const totalFineAmount = fines.reduce((sum, fine) => {
+            const amt = typeof fine.amount === 'string' ? parseFloat(fine.amount.replace(/[^\d.-]/g,'')) : Number(fine.amount || 0);
+            return sum + (isNaN(amt) ? 0 : amt);
+        }, 0);
+
+        weekResults.push(Object.assign({}, week, weekData, { fines: fines, totalFineAmount }));
+
+        if (weekData.complete) {
+            lastCompleteWeek = weekResults[weekResults.length - 1];
+        }
+    }
+
+    // Display last complete week (if any)
+    displayLastCompleteWeek(lastCompleteContainer, lastCompleteWeek);
+
+    // Display weekly history (most recent first)
+    displayWeeklyHistory(historyContainer, weekResults.slice().reverse());
 }
+
 
         // Generate all 52 weeks of 2025 with proper Monday-Sunday ranges
         function generateYearWeeks(year) {
@@ -5483,7 +5494,7 @@ function safeParseMaybe(objOrString, defaultVal) {
 
         // Update fine status function
         function updateFineStatus(fineId, newStatus) {
-            const fines = safeParseMaybe(localStorage.getItem('fines') || '[]');
+            const fines = JSON.parse(localStorage.getItem('fines') || '[]');
             const fineIndex = fines.findIndex(f => f.id === fineId);
             
             if (fineIndex !== -1) {
@@ -5510,7 +5521,7 @@ function safeParseMaybe(objOrString, defaultVal) {
             const currentMonthId = getMonthId(new Date(today.getFullYear(), today.getMonth(), 1));
             const periodId = frequency === 'weekly' ? currentWeekId : currentMonthId;
             
-            const oocUsage = safeParseMaybe(localStorage.getItem('oocUsage') || '{}');
+            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
             const periodUsage = oocUsage[periodId] || {};
             const habitUsage = periodUsage[habitId] || {};
             
@@ -5530,7 +5541,7 @@ function safeParseMaybe(objOrString, defaultVal) {
             const currentMonthId = getMonthId(new Date(today.getFullYear(), today.getMonth(), 1));
             const periodId = frequency === 'weekly' ? currentWeekId : currentMonthId;
             
-            const oocUsage = safeParseMaybe(localStorage.getItem('oocUsage') || '{}');
+            const oocUsage = JSON.parse(localStorage.getItem('oocUsage') || '{}');
             if (!oocUsage[periodId]) oocUsage[periodId] = {};
             if (!oocUsage[periodId][habitId]) oocUsage[periodId][habitId] = {};
             
@@ -5925,62 +5936,5 @@ function safeParseMaybe(objOrString, defaultVal) {
 
 
     </script>
-
-<!-- Dropbox Connect Modal -->
-<div id="dropbox-connect-modal" style="display:none; position:fixed; z-index:10000; left:0; top:0; right:0; bottom:0; align-items:center; justify-content:center; background: rgba(0,0,0,0.5);">
-  <div style="background:white; padding:20px; border-radius:12px; width:90%; max-width:420px; box-shadow:0 8px 30px rgba(0,0,0,0.2);">
-    <h3 style="margin-top:0;">Connect to Dropbox</h3>
-    <p style="color:#333;">Paste a Dropbox access token (personal or generated) below to connect. This token will be kept only in memory for this session.</p>
-    <input id="dropbox-access-token-input" type="text" placeholder="Dropbox access token" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:12px;" />
-    <div style="display:flex; gap:10px; justify-content:flex-end;">
-      <button id="dropbox-connect-cancel" style="padding:8px 12px; background:#95a5a6; color:white; border:none; border-radius:6px; cursor:pointer;">Cancel</button>
-      <button id="dropbox-connect-submit" style="padding:8px 12px; background:#3498db; color:white; border:none; border-radius:6px; cursor:pointer;">Connect</button>
-    </div>
-    <p id="dropbox-connect-error" style="color:#c0392b; display:none; margin-top:10px;"></p>
-  </div>
-</div>
-
-
-<script>
-}
-document.addEventListener('click', function(e){
-    if(e.target && e.target.id === 'dropbox-connect-cancel') closeConnectModal();
-    if(e.target && e.target.id === 'dropbox-connect-submit') connectWithToken();
-});
-
-).value;
-    const errEl = document.getElementById('dropbox-connect-error');
-    if (!token || token.trim().length < 5) {
-        if(errEl){ errEl.textContent = 'Please enter a valid access token.'; errEl.style.display = 'block'; }
-        return;
-    }
-    try {
-        // create Dropbox client in memory and test a small call
-        window.dbx = new Dropbox.Dropbox({ accessToken: token.trim() });
-        // mark authenticated flag
-        window.isAuthenticated = true;
-        // test by listing root folder metadata or getting account info
-        const acct = await window.dbx.usersGetCurrentAccount();
-        console.log('Dropbox account connected:', acct);
-        // close modal
-        closeConnectModal();
-        // re-run bootstrap loader to fetch data
-        if (typeof initCloudFirst === 'function') {
-            initCloudFirst();
-        } else if (typeof loadFromCloud === 'function') {
-            // fallback: try loading directly
-            await loadFromCloud();
-            document.dispatchEvent(new CustomEvent('cloudDataReady', { detail: window.CLOUD_DATA }));
-        }
-    } catch (err) {
-        console.error('Dropbox connect failed:', err);
-        if(errEl){ errEl.textContent = 'Connection failed. Check token and internet. ' + (err && err.error && err.error.error_summary ? err.error.error_summary : ''); errEl.style.display = 'block'; }
-        // reset auth
-        window.dbx = null;
-        window.isAuthenticated = false;
-    }
-}
-</script>
-
 </body>
 </html>
