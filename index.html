@@ -1695,6 +1695,116 @@
     </style>
 </head>
 <body>
+
+<script>
+// BOOTSTRAP: Ensure app uses Dropbox as single source of truth.
+// This runs early and blocks rendering of tabs until cloud data is loaded.
+window.CLOUD_DATA = null;
+window.DROPBOX_AVAILABLE = false;
+
+async function initCloudFirst() {
+    try {
+        if (typeof loadFromCloud !== 'function') {
+            console.error('loadFromCloud not available.'); 
+            showDropboxUnavailable('Dropbox loader missing.');
+            return;
+        }
+        const data = await loadFromCloud();
+        if (!data) {
+            showDropboxUnavailable('Dropbox returned no data.');
+            return;
+        }
+        window.CLOUD_DATA = data;
+        window.DROPBOX_AVAILABLE = true;
+        console.log('CLOUD_DATA loaded (bootstrap):', window.CLOUD_DATA);
+
+        // Update connection-status UI if present
+        const connBtn = document.getElementById('connection-status-btn');
+        if (connBtn) {
+            connBtn.textContent = '☁️ Connected (Dropbox)';
+            connBtn.style.backgroundColor = '#27ae60';
+            connBtn.title = 'Connected to Dropbox';
+        }
+
+        // Remove any existing unavailable banner
+        const existing = document.getElementById('dropbox-unavailable-banner');
+        if (existing) existing.remove();
+
+        // Fire an event so other parts of the app can react
+        document.dispatchEvent(new CustomEvent('cloudDataReady', { detail: window.CLOUD_DATA }));
+    } catch (err) {
+        console.error('initCloudFirst error:', err);
+        showDropboxUnavailable('Error connecting to Dropbox.');
+    }
+}
+
+function showDropboxUnavailable(message) {
+    window.DROPBOX_AVAILABLE = false;
+    let banner = document.getElementById('dropbox-unavailable-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'dropbox-unavailable-banner';
+        banner.style.position = 'fixed';
+        banner.style.top = '0';
+        banner.style.left = '0';
+        banner.style.right = '0';
+        banner.style.background = '#ffdddd';
+        banner.style.color = '#900';
+        banner.style.padding = '12px';
+        banner.style.zIndex = '9999';
+        banner.style.textAlign = 'center';
+        banner.style.fontWeight = '700';
+        document.body.appendChild(banner);
+    }
+    banner.textContent = 'Dropbox unavailable: ' + message + ' — the app is offline. Local storage is disabled by policy.';
+    // visually disable main UI if present
+    const container = document.querySelector('.container');
+    if (container) {
+        container.style.filter = 'grayscale(60%) blur(1px)';
+        container.style.pointerEvents = 'none';
+    }
+    const connBtn = document.getElementById('connection-status-btn');
+    if (connBtn) {
+        connBtn.textContent = '☁️ Unavailable';
+        connBtn.style.backgroundColor = '#95a5a6';
+        connBtn.title = 'Dropbox unavailable';
+    }
+}
+
+// Neutralize localStorage.setItem to prevent writes (policy: never use localStorage)
+(function disableLocalStorageWrites(){
+    try {
+        const origSet = localStorage.setItem;
+        localStorage.setItem = function(){ console.warn('localStorage.setItem blocked by policy.'); };
+    } catch(e){
+        // ignore (some environments may restrict overriding)
+    }
+})();
+
+// Start bootstrapping once DOM is ready enough
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCloudFirst);
+} else {
+    initCloudFirst();
+}
+</script>
+
+
+<script>
+function getCloudOrThrow(key, defaultVal) {
+    if (!window.DROPBOX_AVAILABLE) {
+        throw new Error('DROPBOX_UNAVAILABLE');
+    }
+    if (!window.CLOUD_DATA) return defaultVal === undefined ? null : defaultVal;
+    return window.CLOUD_DATA[key] !== undefined ? window.CLOUD_DATA[key] : (defaultVal === undefined ? null : defaultVal);
+}
+
+// Fire an event when cloud data is ready (if already ready)
+if (window.CLOUD_DATA) {
+    document.dispatchEvent(new CustomEvent('cloudDataReady', { detail: window.CLOUD_DATA }));
+}
+</script>
+
     <div class="container">
         <h1>Daily Journal & Habit Tracker</h1>
         
@@ -2271,7 +2381,7 @@
                 
                 if (accessToken) {
                     dropboxAccessToken = accessToken;
-                    localStorage.setItem('dropboxAccessToken', accessToken);
+                    /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
                     isAuthenticated = true;
                     dbx = new Dropbox.Dropbox({ accessToken: accessToken });
                     
@@ -2482,10 +2592,10 @@
             try {
                 // Collect all local data
                 const allData = {
-                    journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
-                    habits: JSON.parse(localStorage.getItem('habits') || '[]'),
-                    finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
-                    dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
+                    journalEntries: (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {},
+                    habits: (window.CLOUD_DATA && window.CLOUD_DATA['habits']) || [],
+                    finesStatus: (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {},
+                    dailyHabitTracking: (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {},
                     lastSync: new Date().toISOString()
                 };
                 
@@ -2527,10 +2637,10 @@
             
             try {
                 const allData = {
-                    journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
-                    habits: JSON.parse(localStorage.getItem('habits') || '[]'),
-                    finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
-                    dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
+                    journalEntries: (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {},
+                    habits: (window.CLOUD_DATA && window.CLOUD_DATA['habits']) || [],
+                    finesStatus: (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {},
+                    dailyHabitTracking: (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {},
                     lastSync: new Date().toISOString()
                 };
                 
@@ -2586,7 +2696,7 @@
         // Enhanced save functions that include live sync
         async function saveDataWithSync(key, data) {
             // Always save to localStorage as backup
-            localStorage.setItem(key, JSON.stringify(data));
+            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
             
             // Trigger live sync immediately
             await triggerLiveSync(`${key} saved`);
@@ -2695,7 +2805,7 @@
             recentEmojis = recentEmojis.slice(0, 5);
             
             // Save to localStorage
-            localStorage.setItem('recentEmojis', JSON.stringify(recentEmojis));
+            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
             
             // Re-render the UI
             renderRecentEmojis();
@@ -2751,7 +2861,7 @@
             }
             
             // Check if entry already exists for this date
-            const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+            const entries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
             const existingEntry = entries[date];
             
             if (existingEntry) {
@@ -2774,7 +2884,7 @@
             const habitData = getAllDailyHabitData(date);
             
             // Save to localStorage and sync to cloud
-            const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+            const entries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
             entries[date] = {
                 text: entry,
                 emoji: emoji,
@@ -2858,14 +2968,14 @@
         // localStorage backup functions
         function saveEntryToLocalStorage(date, entry, emoji, habitData) {
             try {
-                const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+                const entries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
                 entries[date] = {
                     text: entry,
                     emoji: emoji,
                     habitData: habitData,
                     timestamp: new Date().toISOString()
                 };
-                localStorage.setItem('journalEntries', JSON.stringify(entries));
+                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
             } catch (error) {
                 console.error('Error saving to localStorage:', error);
             }
@@ -2873,7 +2983,7 @@
 
         function loadEntryFromLocalStorage(date) {
             try {
-                const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+                const entries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
                 return entries[date] || null;
             } catch (error) {
                 console.error('Error loading from localStorage:', error);
@@ -2893,9 +3003,9 @@
                         entry = cloudData.journalEntries[date];
                         console.log('Loaded entry from Dropbox:', entry);
                         // Update localStorage with fresh data from Dropbox
-                        const allEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+                        const allEntries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
                         allEntries[date] = entry;
-                        localStorage.setItem('journalEntries', JSON.stringify(allEntries));
+                        /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
                     }
                 } catch (error) {
                     console.error('Error loading entry from Dropbox:', error);
@@ -3261,7 +3371,8 @@
                         habits = cloudData.habits;
                         console.log('Loaded habits from Dropbox:', habits);
                         // Update localStorage with fresh data from Dropbox
-                        localStorage.setItem('habits', JSON.stringify(habits));
+                        /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                        if (cloudData && cloudData.dailyHabitTracking) { /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled'); }
                         return habits;
                     }
                 } catch (error) {
@@ -3273,7 +3384,7 @@
             // FALLBACK: Only use localStorage if Dropbox fails
             // But NEVER overwrite existing localStorage data
             try {
-                const localHabits = localStorage.getItem('habits');
+                const localHabits = (window.CLOUD_DATA && window.CLOUD_DATA['habits']);
                 habits = localHabits ? JSON.parse(localHabits) : [];
                 console.log('Using localStorage habits (Dropbox unavailable):', habits);
             } catch (error) {
@@ -3292,9 +3403,9 @@
             if (isAuthenticated && dbx) {
                 try {
                     const allData = {
-                        journalEntries: JSON.parse(localStorage.getItem('journalEntries') || '{}'),
+                        journalEntries: (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {},
                         habits: habits,
-                        finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
+                        finesStatus: (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {},
                         lastSync: new Date().toISOString()
                     };
                     const syncSuccess = await syncToCloud(allData);
@@ -3715,7 +3826,7 @@
 
         function getDailyHabitData(date, habitId) {
             try {
-                const data = localStorage.getItem('dailyHabitTracking');
+                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
                 const allData = data ? JSON.parse(data) : {};
                 const dateData = allData[date] || {};
                 return dateData[habitId] || { selectedValue: null, outOfControlMiss: false };
@@ -3726,7 +3837,7 @@
 
         async function saveDailyHabitData(date, habitId, selectedValue, outOfControlMiss) {
             try {
-                const data = localStorage.getItem('dailyHabitTracking');
+                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
                 const allData = data ? JSON.parse(data) : {};
                 
                 if (!allData[date]) {
@@ -3745,7 +3856,7 @@
                     allData[date][habitId].outOfControlMiss = outOfControlMiss;
                 }
 
-                localStorage.setItem('dailyHabitTracking', JSON.stringify(allData));
+                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
                 
                 // Trigger live sync for daily habit tracking
                 await triggerLiveSync('Daily habit tracking updated');
@@ -3756,7 +3867,7 @@
 
         function getAllDailyHabitData(date) {
             try {
-                const data = localStorage.getItem('dailyHabitTracking');
+                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
                 const allData = data ? JSON.parse(data) : {};
                 return allData[date] || {};
             } catch (error) {
@@ -3767,7 +3878,7 @@
         // Get all habit tracking data (for period calculations)
         function getAllHabitTrackingData() {
             try {
-                const data = localStorage.getItem('dailyHabitTracking');
+                const data = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']);
                 return data ? JSON.parse(data) : {};
             } catch (error) {
                 console.error('Error loading all habit tracking data:', error);
@@ -3834,7 +3945,9 @@
                             });
                         }
                         // Update localStorage with fresh data from Dropbox
-                        localStorage.setItem('journalEntries', JSON.stringify(cloudData.journalEntries));
+                        /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
+                        
+                        if (cloudData.dailyHabitTracking) { /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled'); }if (cloudData.dailyHabitTracking) { /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled'); }
                         
                         // Sort entries by date (newest first) and return early
                         entries.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -3849,7 +3962,7 @@
             // FALLBACK: Only use localStorage if Dropbox fails
             // But NEVER overwrite existing localStorage data
             try {
-                const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+                const journalEntries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
                 console.log('Using localStorage entries (Dropbox unavailable):', journalEntries);
                 for (const [date, entry] of Object.entries(journalEntries)) {
                     entries.push({
@@ -3962,7 +4075,7 @@
 
         function getHabitsSync() {
             try {
-                const habits = localStorage.getItem('habits');
+                const habits = (window.CLOUD_DATA && window.CLOUD_DATA['habits']);
                 return habits ? JSON.parse(habits) : [];
             } catch (error) {
                 return [];
@@ -3977,17 +4090,17 @@
 
             try {
                 // Remove from localStorage
-                const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+                const journalEntries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
                 delete journalEntries[dateString];
-                localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
+                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
 
                 // Sync to cloud if connected
                 if (isAuthenticated && dbx) {
                     const allData = {
                         journalEntries: journalEntries,
-                        habits: JSON.parse(localStorage.getItem('habits') || '[]'),
-                        finesStatus: JSON.parse(localStorage.getItem('finesStatus') || '[]'),
-                        dailyHabitTracking: JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}'),
+                        habits: (window.CLOUD_DATA && window.CLOUD_DATA['habits']) || [],
+                        finesStatus: (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {},
+                        dailyHabitTracking: (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {},
                         lastSync: new Date().toISOString()
                     };
                     await syncToCloud(allData);
@@ -4217,7 +4330,7 @@
 
         function countHabitInPeriod(habitId, startDate, endDate, trackingValue) {
             let count = 0;
-            const journalEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+            const journalEntries = (window.CLOUD_DATA && window.CLOUD_DATA['journalEntries']) || {};
             
             for (const [date, entry] of Object.entries(journalEntries)) {
                 const entryDate = new Date(date);
@@ -4315,7 +4428,7 @@
                 savedFines.push({ id: fineId, isPaid: isPaid });
             }
             
-            localStorage.setItem('finesStatus', JSON.stringify(savedFines));
+            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
             
             // Refresh the fines display
             loadFines();
@@ -4323,7 +4436,7 @@
 
         function getSavedFines() {
             try {
-                return JSON.parse(localStorage.getItem('finesStatus') || '[]');
+                return (window.CLOUD_DATA && window.CLOUD_DATA['finesStatus']) || {};
             } catch (error) {
                 return [];
             }
@@ -4714,7 +4827,7 @@
         
         function saveFines(fines) {
             try {
-                localStorage.setItem('fines', JSON.stringify(fines));
+                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
                 triggerLiveSync('Fines updated');
             } catch (error) {
                 console.error('Error saving fines:', error);
@@ -5064,7 +5177,7 @@
             });
             
             // Save updated fines
-            localStorage.setItem('fines', JSON.stringify(allFines));
+            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
             
             return allFines;
         }
@@ -5377,7 +5490,7 @@
             
             if (fineIndex !== -1) {
                 fines[fineIndex].status = newStatus;
-                localStorage.setItem('fines', JSON.stringify(fines));
+                /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
                 
                 // Trigger sync if available
                 if (isAuthenticated && dbx) {
@@ -5429,7 +5542,7 @@
                 oocUsage[periodId][habitId].monthUsed = (oocUsage[periodId][habitId].monthUsed || 0) + 1;
             }
             
-            localStorage.setItem('oocUsage', JSON.stringify(oocUsage));
+            /* localStorage.setItem disabled by policy */ console.warn('localStorage.setItem disabled');
             
             // Trigger sync if available
             if (isAuthenticated && dbx) {
@@ -5665,7 +5778,7 @@
             if (!habit || !goal) return { achieved: 0, percentage: 0 };
             
             const currentYear = new Date().getFullYear();
-            const dailyTracking = JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}');
+            const dailyTracking = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {};
             
             let achieved = 0;
             
@@ -5694,7 +5807,7 @@
         // Calculate weekly streaks for habits
         function calculateWeeklyStreaks(habits) {
             const streakData = [];
-            const dailyTracking = JSON.parse(localStorage.getItem('dailyHabitTracking') || '{}');
+            const dailyTracking = (window.CLOUD_DATA && window.CLOUD_DATA['dailyHabitTracking']) || {};
             
             habits.forEach(habit => {
                 if (habit.frequency !== 'weekly') return;
