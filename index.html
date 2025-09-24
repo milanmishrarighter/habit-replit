@@ -2331,18 +2331,75 @@
             }
         }
 
-        async function loadFromCloud() {
+        
+async function loadFromCloud() {
             if (!isAuthenticated || !dbx) return null;
-            
+
             try {
                 const response = await dbx.filesDownload({ path: '/habit-tracker-data.json' });
                 console.log('Dropbox response:', response);
-                
-                // Correct way to access file content from Dropbox API
-                const fileContent = await response.fileBinary.text();
+
+                // Normalize different SDK shapes (some SDKs return { result: { fileBlob } }, others return { fileBinary } or top-level fileBinary)
+                let fileContent = null;
+
+                // Case: response.result exists (modern Dropbox SDK)
+                if (response && response.result) {
+                    const res = response.result;
+                    if (res.fileBlob && typeof res.fileBlob.text === 'function') {
+                        fileContent = await res.fileBlob.text();
+                    } else if (res.fileBinary) {
+                        // fileBinary might already be a string or an ArrayBuffer/Uint8Array
+                        if (typeof res.fileBinary === 'string') {
+                            fileContent = res.fileBinary;
+                        } else if (res.fileBinary instanceof Blob && typeof res.fileBinary.text === 'function') {
+                            fileContent = await res.fileBinary.text();
+                        } else if (res.fileBinary instanceof Uint8Array) {
+                            // decode utf-8
+                            fileContent = new TextDecoder().decode(res.fileBinary);
+                        }
+                    } else if (res.fileBlob === undefined && typeof res === 'string') {
+                        fileContent = res;
+                    }
+                }
+
+                // Case: older SDK or different shape where fileBinary is top-level
+                if (!fileContent && response && response.fileBinary) {
+                    if (typeof response.fileBinary === 'string') {
+                        fileContent = response.fileBinary;
+                    } else if (response.fileBinary instanceof Blob && typeof response.fileBinary.text === 'function') {
+                        fileContent = await response.fileBinary.text();
+                    } else if (response.fileBinary instanceof Uint8Array) {
+                        fileContent = new TextDecoder().decode(response.fileBinary);
+                    }
+                }
+
+                // Last resort: stringify response.result or response
+                if (!fileContent) {
+                    if (response && response.result) {
+                        try { fileContent = JSON.stringify(response.result); } catch (e) { fileContent = null; }
+                    } else {
+                        try { fileContent = JSON.stringify(response); } catch (e) { fileContent = null; }
+                    }
+                }
+
+                if (!fileContent) {
+                    console.warn('Could not extract file content from Dropbox response.');
+                    return null;
+                }
+
                 console.log('Successfully loaded data from Dropbox');
                 return JSON.parse(fileContent);
             } catch (error) {
+                if (error && (error.status === 409 || (error.error_summary && error.error_summary.includes('not_found')))) {
+                    // File doesn't exist yet, which is fine for first time users
+                    console.log('Dropbox file not found - this is normal for first-time users.');
+                    return null;
+                }
+                console.error('Error loading from cloud (patched):', error);
+                return null;
+            }
+        }
+ catch (error) {
                 if (error.status === 409 || error.error_summary?.includes('not_found')) {
                     // File doesn't exist yet, which is fine for first time users
                     console.log('Dropbox file not found - this is normal for first time users');
@@ -5067,25 +5124,12 @@
                 const weekData = checkWeekData(week, dailyData);
                 const fines = weekData.complete ? calculateWeekFines(week, dailyData, habits) : [];
                 
-                // Push a properly structured object
-        weekResults.push({
-            week: week,
-            weekNumber: week.weekNumber,
-            startDate: week.startDate,
-            endDate: week.endDate,
-            dateRange: week.dateRange,
-            complete: weekData.complete,
-            daysWithData: weekData.daysWithData,
-            totalDays: weekData.totalDays,
-            status: weekData.status,
-            fines: fines,
-            totalFineAmount: fines.reduce((sum, fine) => sum + (parseFloat(fine.amount) || 0), 0)
-        });
-
-        // Track last complete week
-        if (weekData.complete) {
-            lastCompleteWeek = weekResults[weekResults.length - 1];
-        }
+                weekResults.push({
+                    ...week,
+                    ...weekData,
+                    fines: fines,
+                    totalFineAmount: fines.reduce((sum, fine) => sum + fine.amount, 0)
+                });
                 
                 // Track last complete week
                 if (weekData.complete) {
