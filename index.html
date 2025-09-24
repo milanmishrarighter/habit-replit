@@ -1802,6 +1802,25 @@ document.addEventListener('cloudDataReady', function(){
 });
 </script>
 
+
+<script id="session-dropbox-helper">
+// Session-based Dropbox token helper (v24 patch)
+(function(){
+    function safeParse(s){ try { return JSON.parse(s); } catch(e){ return null; } }
+    window.dbxSession = {
+        getToken: function(){ try { return safeParse(sessionStorage.getItem('dropboxToken')); } catch(e){ return null; } },
+        setToken: function(token){ try { sessionStorage.setItem('dropboxToken', JSON.stringify(token)); } catch(e){} },
+        removeToken: function(){ try { sessionStorage.removeItem('dropboxToken'); } catch(e){} },
+        hasToken: function(){ try { return !!sessionStorage.getItem('dropboxToken'); } catch(e){ return false; } }
+    };
+    // If there's a token in sessionStorage but existing code expects window.DROPBOX_TOKEN, set it for compatibility
+    try {
+        var t = window.dbxSession.getToken();
+        if (t) window.DROPBOX_TOKEN = t;
+    } catch(e){}
+})();
+</script>
+
 </head>
 <body>
 
@@ -6059,5 +6078,19 @@ function generateYearWeeks(year) {
 
 
     </script>
+
+<script id="dbx-compat-wrappers">
+// Compatibility wrappers to centralize token set/clear used by UI flows
+function setDropboxTokenForSession(tokenObj){
+    try { window.dbxSession.setToken(tokenObj); window.DROPBOX_TOKEN = tokenObj; console.log('Dropbox token stored in session'); } catch(e){ console.warn(e); }
+}
+function clearDropboxTokenForSession(){
+    try { window.dbxSession.removeToken(); window.DROPBOX_TOKEN = null; console.log('Dropbox token cleared from session'); } catch(e){ console.warn(e); }
+}
+// expose names some code might use
+window.setDropboxTokenForSession = setDropboxTokenForSession;
+window.clearDropboxTokenForSession = clearDropboxTokenForSession;
+</script>
+
 </body>
 </html>
