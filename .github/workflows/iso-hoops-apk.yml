@@ -55,13 +55,13 @@ jobs:
       # Artifacts can only be downloaded while signed in to GitHub; a release
       # asset gives a plain download link that works on a phone.
       - name: Publish APK as a release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: iso-hoops-latest
-          name: Iso Hoops (latest debug build)
-          body: |
-            Debug APK for Iso Hoops, built from `${{ github.sha }}`.
-            Download `app-debug.apk`, open it on an Android phone and allow
-            installing from unknown sources.
-          files: iso-hoops/android/app/build/outputs/apk/debug/app-debug.apk
-          prerelease: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          gh release delete iso-hoops-latest --yes --cleanup-tag || true
+          gh release create iso-hoops-latest "$APK" \
+            --title "Iso Hoops (latest debug build)" \
+            --notes "Debug APK for Iso Hoops, built from ${{ github.sha }}. Download app-debug.apk, open it on an Android phone and allow installing from unknown sources." \
+            --prerelease \
+            --target ${{ github.sha }}
