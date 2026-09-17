@@ -3,37 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#F7F4EC">
+<meta name="theme-color" content="#12213E">
 <title>Iso Hoops</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;overflow:hidden;background:#F7F4EC;
+  html,body{width:100%;height:100%;overflow:hidden;background:#12213E;
     font-family:Archivo,'Segoe UI',system-ui,sans-serif;
     -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
   #stage{position:fixed;inset:0;touch-action:none}
   canvas{display:block;width:100%;height:100%;touch-action:none}
-  .hud{position:fixed;pointer-events:none;color:#12213E}
+  .hud{position:fixed;pointer-events:none;color:#F7F4EC}
   #score{top:calc(env(safe-area-inset-top,0px) + 14px);left:calc(env(safe-area-inset-left,0px) + 16px)}
-  #score .n{font-size:52px;font-weight:900;line-height:.92;color:#D42E2E;
-    -webkit-text-stroke:2.5px #12213E;letter-spacing:-1px}
-  #score .s{margin-top:2px;font-size:13px;font-weight:700;color:#F7F4EC;
-    background:#12213E;border-radius:999px;padding:2px 9px;display:inline-block}
+  #score .n{font-size:52px;font-weight:900;line-height:.92;color:#E8681F;
+    letter-spacing:-1px}
+  #score .s{margin-top:2px;font-size:13px;font-weight:700;color:#12213E;
+    background:#F7F4EC;border-radius:999px;padding:2px 9px;display:inline-block}
   #stage-pill{top:calc(env(safe-area-inset-top,0px) + 16px);right:calc(env(safe-area-inset-right,0px) + 16px);
     text-align:right}
   #stage-pill .p{font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;
-    background:#1E52C7;border-radius:999px;padding:5px 11px;display:inline-block;color:#F7F4EC}
+    background:#E8681F;border-radius:999px;padding:5px 11px;display:inline-block;color:#12213E}
   #hint{top:calc(env(safe-area-inset-top,0px) + 60px);left:0;right:0;text-align:center;
     transition:opacity .45s}
-  #hint span{font-size:12.5px;font-weight:700;background:#12213E;color:#F7F4EC;
+  #hint span{font-size:12.5px;font-weight:700;background:#F7F4EC;color:#12213E;
     border-radius:999px;padding:6px 14px;display:inline-block}
   #hint.gone{opacity:0}
 
   /* ---- control panel: sliders + buttons, no touch-drag on the court ---- */
   #panel{position:fixed;left:0;right:0;bottom:0;padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 12px);
-    background:linear-gradient(to top, rgba(18,33,62,.97), rgba(18,33,62,.90));
+    background:linear-gradient(to top, rgba(9,15,29,.97), rgba(9,15,29,.90));
     display:flex;flex-direction:column;gap:9px;z-index:4}
   .row{display:flex;align-items:center;gap:8px}
   .row label{width:56px;flex:0 0 auto;font-size:11.5px;font-weight:900;letter-spacing:.5px;
@@ -43,15 +43,15 @@
     display:flex;align-items:center;justify-content:center}
   .stepbtn:active{background:#163d99}
   input[type=range]{flex:1 1 auto;height:34px;-webkit-appearance:none;background:transparent}
-  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:5px;background:#2b3f68}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:5px;background:#22315a}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;
-    background:#D42E2E;border:3px solid #F7F4EC;margin-top:-9px}
-  .readout{width:44px;flex:0 0 auto;text-align:right;font-size:13px;font-weight:900;color:#F7F4EC}
+    background:#E8681F;border:3px solid #F7F4EC;margin-top:-9px}
+  .readout{width:48px;flex:0 0 auto;text-align:right;font-size:13px;font-weight:900;color:#F7F4EC}
   #shootBtn{width:100%;height:52px;border:none;border-radius:14px;
-    background:#D42E2E;color:#F7F4EC;font-size:18px;font-weight:900;letter-spacing:1px;
-    text-transform:uppercase;box-shadow:0 4px 0 #8f1c1c}
-  #shootBtn:active{transform:translateY(2px);box-shadow:0 2px 0 #8f1c1c}
-  #shootBtn:disabled{background:#5a6685;box-shadow:0 4px 0 #3c4460;color:#c3c9d8}
+    background:#E8681F;color:#F7F4EC;font-size:18px;font-weight:900;letter-spacing:1px;
+    text-transform:uppercase}
+  #shootBtn:active{transform:translateY(2px)}
+  #shootBtn:disabled{background:#3c4460;color:#8188a0}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -65,14 +65,14 @@
   <div class="row">
     <label>Aim</label>
     <button class="stepbtn" id="aimDown">&#8249;</button>
-    <input type="range" id="aimSlider" min="-45" max="45" step="1" value="0">
+    <input type="range" id="aimSlider" min="-180" max="180" step="1" value="0">
     <button class="stepbtn" id="aimUp">&#8250;</button>
     <div class="readout" id="aimReadout">0°</div>
   </div>
   <div class="row">
     <label>Power</label>
     <button class="stepbtn" id="powDown">&minus;</button>
-    <input type="range" id="powSlider" min="0" max="100" step="1" value="55">
+    <input type="range" id="powSlider" min="0" max="200" step="1" value="110">
     <button class="stepbtn" id="powUp">&#43;</button>
     <div class="readout" id="powReadout">55%</div>
   </div>
@@ -92,28 +92,24 @@ const G = 32.17, DT = 1/240;
 // above the ring and gives a ~55deg entry, which the ball actually fits through.
 const LAUNCH_DEG = 70;
 const LAUNCH = LAUNCH_DEG * Math.PI/180;
-const MAX_SPEED = 46;
+// Power slider runs 0-200%: 100% is the speed a made shot actually needs from
+// a typical distance, the extra headroom above and below gives real range to
+// undershoot or bomb it from way downtown.
+const MAX_SPEED = 34;
 
-const BASELINE = -5.25, HALFWAY = 41.75, SIDE = 25;
-const KEY_HW = 8, FT_Y = 13.75, FT_R = 6, RA_R = 4;
-const TP_X = 22, TP_R = 23.75, TP_STRAIGHT = Math.sqrt(TP_R*TP_R - TP_X*TP_X);
 const RIM_R = 0.75, RIM_Z = 10, BALL_R = 0.39;
 const BB_W = 6, BB_H = 3.5, BB_OFF = 1.25;
+const SCORE_KEY_R = 8, SCORE_ARC_R = 23.75;
 
-const APRON_X = 29, APRON_BACK = -10.5, APRON_FRONT = 43.5;
-
-// Evening-sun palette: warm white infinite canvas, a red/navy split court,
-// hard offset shadows from one fixed light direction, real basketball orange.
+// No court, no boundary lines: an infinite navy canvas with a faint lattice
+// and a warm evening-sun glow in one corner. No white strokes, no drop shadows.
 const COL = {
-  bg:'#F7F4EC', grid:'#EAE3D2', ink:'#12213E',
-  paint:'#D42E2E', paintDeep:'#A81F1F',
-  navy:'#1E3A73', navyDeep:'#12213E',
-  line:'#F7F4EC', lineShadow:'rgba(18,33,62,.28)',
+  bg:'#12213E', grid:'rgba(255,255,255,.055)',
   ball:'#E8681F', ballDark:'#B8460F', seam:'#12213E',
-  net:'#F7F4EC', rim:'#D42E2E', rimDark:'#8f1c1c',
-  sun:'rgba(255,196,102,.35)', bloom:'rgba(255,214,140,.9)'
+  net:'rgba(200,214,255,.55)', rim:'#E8681F', rimDark:'#B8460F',
+  board:'#1E3A73', boardEdge:'#E8681F',
+  sun:'rgba(255,196,102,.16)'
 };
-const LIGHT_DX = 0.62, LIGHT_DY = -0.5; // evening sun: upper-right, casts shadow down-left
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------------- canvas / camera ---------------- */
@@ -125,39 +121,34 @@ function resize(){
   W = cv.clientWidth; H = cv.clientHeight;
   cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
   ctx.setTransform(DPR,0,0,DPR,0,0);
-  fitCamera();
-}
-const ZOOM = 1.86;
-function fitCamera(){
-  const pts=[[-APRON_X,APRON_BACK],[APRON_X,APRON_BACK],[APRON_X,APRON_FRONT],[-APRON_X,APRON_FRONT]];
-  let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
-  for(const [x,y] of pts){
-    const rx = x*CY - y*SY, ry = (x*SY + y*CY)*PITCH;
-    minx=Math.min(minx,rx); maxx=Math.max(maxx,rx);
-    miny=Math.min(miny,ry); maxy=Math.max(maxy,ry);
-  }
-  const top = miny - (RIM_Z + 3.5);
-  const sx = W/(maxx-minx), sy = H/(maxy-top);
-  S = Math.min(sx*ZOOM, sy*1.42);
-  camX = W/2 - ((minx+maxx)/2)*S;
-  camY = H/2 - ((top+maxy)/2)*S + H*0.02;
+  S = Math.min(W,H) * 0.042;
+  centerCamera(focus.x, focus.y);
 }
 function proj(x,y,z){
   const rx = x*CY - y*SY, ry = x*SY + y*CY;
   return [rx*S + camX, ry*S*PITCH - z*S + camY];
 }
+// The camera just recenters on the midpoint of the ball and hoop each round —
+// there's no court to frame against, so the "framing" is always the play.
+const focus = {x:0,y:14};
+function centerCamera(fx,fy){
+  focus.x=fx; focus.y=fy;
+  const rx = fx*CY - fy*SY, ry = (fx*SY + fy*CY)*PITCH;
+  camX = W/2 - rx*S;
+  camY = H*0.36 - ry*S;
+}
 
 /* ---------------- hoop (moving target) ---------------- */
 const hoop = {
-  baseX:0, x:0, yaw:0, tilt:0, driftAmp:0, driftPhase:0, t:0,
-  cx:0, cy:0, cz:RIM_Z,
+  cx:0, cy:14, cz:RIM_Z, yaw:0, tilt:0, driftAmp:0, driftPhase:0, t:0, baseX:0, baseY:14,
   u:[1,0,0], v:[0,1,0], n:[0,0,1]
 };
 function hoopUpdate(dt){
   hoop.t += dt;
   const drift = hoop.driftAmp ? Math.sin(hoop.t*0.9 + hoop.driftPhase)*hoop.driftAmp : 0;
-  hoop.cx = hoop.baseX + hoop.x + drift;
-  hoop.cy = 0; hoop.cz = RIM_Z;
+  hoop.cx = hoop.baseX + drift;
+  hoop.cy = hoop.baseY;
+  hoop.cz = RIM_Z;
   const c=Math.cos(hoop.yaw), s=Math.sin(hoop.yaw);
   const u=[c,s,0], v0=[-s,c,0], n0=[0,0,1];
   const ct=Math.cos(hoop.tilt), st=Math.sin(hoop.tilt);
@@ -190,48 +181,50 @@ function stageIndex(sc){ let i=0; for(let k=0;k<STAGES.length;k++) if(sc>=STAGES
 function rollHoop(){
   const i = stageIndex(game.score);
   const R = (a)=> (Math.random()*2-1)*a;
-  hoop.x     = i>=1 ? R(9)    : 0;
+  // Placement itself is random every round (below); stages only add the
+  // extra dynamic movement on top of wherever it lands.
+  hoop.baseX = (Math.random()*2-1)*26;
+  hoop.baseY = 8 + Math.random()*30;
   hoop.yaw   = i>=2 ? R(0.26) : 0;
   hoop.tilt  = i>=3 ? R(0.17) : 0;
   hoop.driftAmp = i>=4 ? 4.5  : 0;
   hoop.driftPhase = Math.random()*Math.PI*2;
-  hoop.x = Math.max(-SIDE+6-hoop.baseX, Math.min(SIDE-6-hoop.baseX, hoop.x));
   document.getElementById('stageP').textContent = 'STAGE '+(i+1)+' · '+STAGES[i].name;
 }
 
 /* ---------------- game state ---------------- */
 const game = {
   score:0, makes:0, attempts:0,
-  ball:{x:0,y:12,z:BALL_R,vx:0,vy:0,vz:0,
-        spinAngle:0, spinRate:0, spinPhaseX:0, spinPhaseY:2.1},
+  ball:{x:0,y:0,z:BALL_R,vx:0,vy:0,vz:0,
+        spinAngle:0, spinRate:0, spinPhaseA:0, spinPhaseB:2.09, spinPhaseC:4.19},
   live:false, resetAt:0, spawnPts:2,
   aimDeg:0, power:0.55,
   preview:null, previewLand:null
 };
 
-function pointValue(x,y){
-  const inKey = Math.abs(x)<=KEY_HW && y<=FT_Y && y>=BASELINE;
-  if(inKey) return 1;
-  const corner = Math.abs(x)>=TP_X && y<=TP_STRAIGHT;
-  const beyond = corner || Math.hypot(x,y)>=TP_R;
-  return beyond?3:2;
+function pointValue(dist){
+  if(dist<=SCORE_KEY_R) return 1;
+  if(dist<=SCORE_ARC_R) return 2;
+  return 3;
 }
 
 function spawnBall(){
   rollHoop();
-  let x=0,y=12,tries=0;
+  hoopUpdate(0);
+  let x=hoop.cx,y=hoop.cy+10,tries=0;
   while(tries++ < 200){
-    const cx = (Math.random()*2-1)*(SIDE-2.5);
-    const cy = 1.5 + Math.random()*27;
-    if(Math.hypot(cx-hoop.cx, cy) < 4.5) continue;
-    const p = proj(cx,cy,0);
-    if(p[0]<70 || p[0]>W-70 || p[1]<H*0.18 || p[1]>H-220) continue;
+    const a = Math.random()*Math.PI*2;
+    const d = 5 + Math.random()*9;
+    const cx = hoop.cx + Math.cos(a)*d;
+    const cy = hoop.cy + Math.sin(a)*d;
+    if(cy < 1) continue;
     x=cx; y=cy; break;
   }
   const b=game.ball;
   b.x=x; b.y=y; b.z=BALL_R; b.vx=b.vy=b.vz=0; b.spinRate=0;
-  game.spawnPts = pointValue(x,y);
+  game.spawnPts = pointValue(Math.hypot(x-hoop.cx, y-hoop.cy));
   game.live=false; game.resetAt=0;
+  centerCamera((x+hoop.cx)/2, (y+hoop.cy)/2);
   shootBtn.disabled=false;
   computePreview();
 }
@@ -241,9 +234,11 @@ function stepBall(b, dt, detect){
   b.vz -= G*dt;
   b.x += b.vx*dt; b.y += b.vy*dt; b.z += b.vz*dt;
 
-  // spin: rolls proportional to horizontal speed, decays toward it
-  const targetRate = Math.hypot(b.vx,b.vy)/BALL_R;
-  b.spinRate += (targetRate-b.spinRate)*Math.min(1,dt*6);
+  // Spin: a real rolling ball turns at speed/radius, which for a 0.39ft ball
+  // is dozens of rad/s - way too fast to read as anything but a strobe. Scale
+  // it down to something a human eye reads as "spinning", not flickering.
+  const targetRate = Math.min(9, Math.hypot(b.vx,b.vy)*0.55);
+  b.spinRate += (targetRate-b.spinRate)*Math.min(1,dt*3.2);
   b.spinAngle += b.spinRate*dt;
 
   // rim ring
@@ -261,7 +256,7 @@ function stepBall(b, dt, detect){
       const pen = BALL_R-dist;
       b.x += nw[0]*pen; b.y += nw[1]*pen; b.z += nw[2]*pen;
       const vn = b.vx*nw[0]+b.vy*nw[1]+b.vz*nw[2];
-      if(vn<0){ const j=-(1+0.48)*vn; b.vx+=nw[0]*j; b.vy+=nw[1]*j; b.vz+=nw[2]*j; b._hit='rim'; b.spinRate+=(Math.random()*2-1)*4; }
+      if(vn<0){ const j=-(1+0.48)*vn; b.vx+=nw[0]*j; b.vy+=nw[1]*j; b.vz+=nw[2]*j; }
     }
   }
 
@@ -278,7 +273,7 @@ function stepBall(b, dt, detect){
       const j=-(1+0.55)*vv;
       b.vx+=hoop.v[0]*j; b.vy+=hoop.v[1]*j; b.vz+=hoop.v[2]*j;
       const pen = (-BB_OFF+BALL_R)-bv;
-      b.x+=hoop.v[0]*pen; b.y+=hoop.v[1]*pen; b.z+=hoop.v[2]*pen; b._hit='board';
+      b.x+=hoop.v[0]*pen; b.y+=hoop.v[1]*pen; b.z+=hoop.v[2]*pen;
     }
   }
 
@@ -294,9 +289,7 @@ function stepBall(b, dt, detect){
 
 /* ---------------- aiming preview (driven by sliders, not touch) ---------------- */
 function currentDir(){
-  const b=game.ball;
-  const baseA = Math.atan2(hoop.cy-b.y, hoop.cx-b.x);
-  const a = baseA + game.aimDeg*Math.PI/180;
+  const a = game.aimDeg*Math.PI/180;
   return [Math.cos(a), Math.sin(a)];
 }
 function launchVector(){
@@ -309,7 +302,7 @@ function computePreview(){
   const b=game.ball, v=launchVector();
   const sim={x:b.x,y:b.y,z:b.z,vx:v[0],vy:v[1],vz:v[2]};
   const pts=[]; let land=null;
-  for(let i=0;i<240*4;i++){
+  for(let i=0;i<240*5;i++){
     stepBall(sim, DT, false);
     if(i%6===0) pts.push([sim.x,sim.y,sim.z]);
     if(!land && sim.z<=BALL_R+0.02 && sim.vz<=0 && i>20) land=[sim.x,sim.y];
@@ -327,7 +320,7 @@ let interacted=false;
 
 function onAimChange(){
   game.aimDeg = +aimSlider.value;
-  aimReadout.textContent = (game.aimDeg>0?'+':'')+game.aimDeg+'°';
+  aimReadout.textContent = game.aimDeg+'°';
   computePreview();
   noteInteract();
 }
@@ -339,7 +332,11 @@ function onPowChange(){
 }
 function noteInteract(){ if(!interacted){ interacted=true; hint.classList.add('gone'); } }
 function step(slider,delta,handler){
-  slider.value = Math.max(+slider.min, Math.min(+slider.max, (+slider.value)+delta));
+  let v = (+slider.value)+delta;
+  const min=+slider.min, max=+slider.max;
+  if(slider===aimSlider){ if(v>max) v-=(max-min); if(v<min) v+=(max-min); } // 360deg wraps
+  else v = Math.max(min, Math.min(max, v));
+  slider.value = v;
   handler();
 }
 aimSlider.addEventListener('input', onAimChange);
@@ -367,79 +364,29 @@ function syncHUD(){
 function mv(p){ ctx.moveTo(p[0],p[1]); }
 function ln(p){ ctx.lineTo(p[0],p[1]); }
 function polyPath(pts){ ctx.beginPath(); mv(pts[0]); for(let i=1;i<pts.length;i++) ln(pts[i]); ctx.closePath(); }
-function inkFill(pts,fill,lw){
-  polyPath(pts); ctx.fillStyle=fill; ctx.fill();
-  if(lw){ ctx.lineWidth=lw; ctx.strokeStyle=COL.ink; ctx.lineJoin='round'; ctx.stroke(); }
-}
+function fillOnly(pts,fill){ polyPath(pts); ctx.fillStyle=fill; ctx.fill(); }
 function strokePts(pts,color,lw){
   ctx.beginPath(); mv(pts[0]); for(let i=1;i<pts.length;i++) ln(pts[i]);
   ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.stroke();
 }
-function arcPts(cx,cy,r,a0,a1,n){
-  const out=[]; for(let i=0;i<=n;i++){ const a=a0+(a1-a0)*i/n; out.push(proj(cx+Math.cos(a)*r, cy+Math.sin(a)*r, 0)); }
-  return out;
-}
-function groundLine(x0,y0,x1,y1){ return [proj(x0,y0,0), proj(x1,y1,0)]; }
-// hard offset shadow direction of a fixed evening sun (no blur, sharp silhouette)
-function shadowOffset(){ return [22*LIGHT_DX, 22*-LIGHT_DY]; }
 
-/* ---------------- background: white canvas, lattice, evening sun ---------------- */
+/* ---------------- background: navy infinite canvas + lattice + sun glow ---------------- */
 function drawBackground(){
   ctx.fillStyle=COL.bg; ctx.fillRect(0,0,W,H);
   const g = ctx.createRadialGradient(W*0.86,H*0.1,0, W*0.86,H*0.1, Math.max(W,H)*0.95);
   g.addColorStop(0, COL.sun); g.addColorStop(1,'rgba(255,196,102,0)');
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
-  ctx.strokeStyle=COL.grid; ctx.lineWidth=1.4;
-  const step=10, ext=90;
+  ctx.strokeStyle=COL.grid; ctx.lineWidth=1.2;
+  const step=10, ext=140;
+  const ox = focus.x - (focus.x%step), oy = focus.y - (focus.y%step);
   ctx.beginPath();
-  for(let x=-ext;x<=ext;x+=step){ const a=proj(x,-ext,0), b=proj(x,ext,0); mv(a); ln(b); }
-  for(let y=-ext;y<=ext;y+=step){ const a=proj(-ext,y,0), b=proj(ext,y,0); mv(a); ln(b); }
+  for(let x=-ext;x<=ext;x+=step){ const wx=ox+x; const a=proj(wx,oy-ext,0), b=proj(wx,oy+ext,0); mv(a); ln(b); }
+  for(let y=-ext;y<=ext;y+=step){ const wy=oy+y; const a=proj(ox-ext,wy,0), b=proj(ox+ext,wy,0); mv(a); ln(b); }
   ctx.stroke();
 }
 
-/* ---------------- court: red/navy split, hard shadow, white lines ---------------- */
-function drawCourt(){
-  const off = shadowOffset();
-  const outline=[proj(-SIDE,BASELINE,0),proj(SIDE,BASELINE,0),proj(SIDE,HALFWAY,0),proj(-SIDE,HALFWAY,0)];
-
-  ctx.save();
-  const shadowPts = outline.map(p=>[p[0]+off[0], p[1]+off[1]]);
-  inkFill(shadowPts, 'rgba(18,33,62,.22)', 0);
-  ctx.restore();
-
-  inkFill(outline, COL.navy, 5);
-  const diag=[proj(-SIDE,BASELINE,0),proj(SIDE,BASELINE,0),proj(SIDE,FT_Y+6,0),proj(-SIDE,FT_Y-6,0)];
-  inkFill(diag, COL.paint, 0);
-
-  courtLines();
-}
-function courtLines(){
-  const sets=[];
-  sets.push(groundLine(-SIDE,BASELINE,SIDE,BASELINE));
-  sets.push(groundLine(-SIDE,BASELINE,-SIDE,HALFWAY));
-  sets.push(groundLine(SIDE,BASELINE,SIDE,HALFWAY));
-  sets.push(groundLine(-SIDE,HALFWAY,SIDE,HALFWAY));
-  sets.push([proj(-KEY_HW,BASELINE,0),proj(-KEY_HW,FT_Y,0),proj(KEY_HW,FT_Y,0),proj(KEY_HW,BASELINE,0)]);
-  sets.push(arcPts(0,FT_Y,FT_R,0,Math.PI*2,48));
-  sets.push(arcPts(hoop.baseX,0,RA_R,0,Math.PI,24));
-  sets.push(groundLine(-TP_X,BASELINE,-TP_X,TP_STRAIGHT));
-  sets.push(groundLine(TP_X,BASELINE,TP_X,TP_STRAIGHT));
-  const a0=Math.atan2(TP_STRAIGHT,TP_X);
-  sets.push(arcPts(0,0,TP_R,a0,Math.PI-a0,60));
-  sets.push(arcPts(0,HALFWAY,FT_R,Math.PI,Math.PI*2,40));
-  for(const s of sets) strokePts(s.map(p=>[p[0]+3,p[1]+5]), COL.lineShadow, 5);
-  for(const s of sets) strokePts(s, COL.line, 4.5);
-}
-
-/* ---------------- hoop: real rim hole, sorted net, hard shadow, bloom ---------------- */
-function drawHoopShadow(){
-  const off = shadowOffset();
-  ctx.save(); ctx.globalAlpha=.28;
-  const sp=arcPts(hoop.cx,hoop.cy,RIM_R*1.5,0,Math.PI*2,20).map(p=>[p[0]+off[0]*0.6,p[1]+off[1]*0.6]);
-  polyPath(sp); ctx.fillStyle=COL.navyDeep; ctx.fill();
-  ctx.restore();
-}
+/* ---------------- hoop: real rim hole, sorted net, no shadow/stroke chrome ---------------- */
 function netStrandsSplit(){
   const back=[], front=[];
   const N=14;
@@ -455,7 +402,7 @@ function netStrandsSplit(){
 }
 function drawNetStrands(list){
   if(!list.length) return;
-  ctx.strokeStyle=COL.net; ctx.lineWidth=2; ctx.beginPath();
+  ctx.strokeStyle=COL.net; ctx.lineWidth=1.6; ctx.beginPath();
   for(const seg of list){ mv(proj(seg.p[0],seg.p[1],seg.p[2])); ln(proj(seg.bottom[0],seg.bottom[1],seg.bottom[2])); }
   ctx.stroke();
   ctx.beginPath();
@@ -470,9 +417,9 @@ function drawNetStrands(list){
   ctx.stroke();
 }
 function drawRimAndBackboard(pre){
-  const post = proj(hoop.cx, -BB_OFF-1.4, 0);
-  const postTop = proj(hoop.cx, -BB_OFF-1.4, RIM_Z+BB_H);
-  strokePts([post,postTop], COL.ink, 8);
+  const post = proj(hoop.cx, hoop.cy-BB_OFF-1.4, 0);
+  const postTop = proj(hoop.cx, hoop.cy-BB_OFF-1.4, RIM_Z+BB_H);
+  strokePts([post,postTop], COL.board, 8);
 
   const corner=(u,n)=>{
     const bx=hoop.cx + u*hoop.u[0] + (-BB_OFF)*hoop.v[0] + n*hoop.n[0];
@@ -481,37 +428,22 @@ function drawRimAndBackboard(pre){
     return proj(bx,by,bz);
   };
   const bb=[corner(-BB_W/2,-0.4),corner(BB_W/2,-0.4),corner(BB_W/2,BB_H),corner(-BB_W/2,BB_H)];
-  inkFill(bb, '#F7F4EC', 4);
+  fillOnly(bb, COL.board);
   const inner=[corner(-1.0,-0.1),corner(1.0,-0.1),corner(1.0,1.5),corner(-1.0,1.5)];
-  polyPath(inner); ctx.strokeStyle=COL.paint; ctx.lineWidth=3.5; ctx.stroke();
+  strokePts([inner[0],inner[1],inner[2],inner[3],inner[0]], COL.boardEdge, 2.5);
 
   drawNetStrands(pre.back);
 
-  // rim ring drawn as a thick torus so the hole reads clearly, with a bloom glow
-  ctx.save();
-  ctx.shadowColor=COL.bloom; ctx.shadowBlur = REDUCED?0:14;
   const ring=[]; for(let i=0;i<=40;i++){ const p=rimPoint(i/40*Math.PI*2); ring.push(proj(p[0],p[1],p[2])); }
-  strokePts(ring, COL.rimDark, 8);
-  strokePts(ring, COL.rim, 5);
-  ctx.restore();
+  strokePts(ring, COL.rimDark, 7);
+  strokePts(ring, COL.rim, 4);
 
   drawNetStrands(pre.front);
 }
 
-/* ---------------- ball: real basketball with spinning seams + hard shadow + bloom rim light ---------------- */
-function drawBallShadow(x,y,z){
-  const off = shadowOffset();
-  const shrink = Math.max(0.32, 1 - z/26);
-  const p=proj(x,y,0);
-  const sr=Math.max(BALL_R*S*1.6,10)*1.15*shrink;
-  ctx.save(); ctx.globalAlpha=.30*shrink+0.08;
-  ctx.beginPath();
-  ctx.ellipse(p[0]+off[0]*0.5*shrink,p[1]+off[1]*0.5*shrink, sr, sr*PITCH,0,0,Math.PI*2);
-  ctx.fillStyle=COL.navyDeep; ctx.fill(); ctx.restore();
-}
+/* ---------------- ball: real basketball, slow realistic spin, no outline/shadow ---------------- */
 function drawBall(){
   const b=game.ball;
-  drawBallShadow(b.x,b.y,b.z);
   const p=proj(b.x,b.y,b.z), r=Math.max(BALL_R*S*1.6, 10);
 
   ctx.save();
@@ -519,34 +451,31 @@ function drawBall(){
   ctx.clip();
   ctx.fillStyle=COL.ball; ctx.fillRect(p[0]-r,p[1]-r,r*2,r*2);
 
-  // spinning seams: two rotating longitude bands (the classic 2D trick of
-  // squashing an ellipse by cos(spin angle)) plus a near-fixed equator.
-  ctx.strokeStyle=COL.seam; ctx.lineWidth=Math.max(1.6, r*0.09);
-  for(const phase of [b.spinPhaseX, b.spinPhaseX+Math.PI/2]){
+  // spinning seams: three longitude bands 60deg apart (classic 8-panel
+  // basketball layout), each a squashed ellipse whose width follows
+  // cos(spin angle) - the standard 2D trick for a rotating sphere.
+  ctx.strokeStyle=COL.seam; ctx.lineWidth=Math.max(1.4, r*0.075);
+  for(const phase of [b.spinPhaseA, b.spinPhaseB, b.spinPhaseC]){
     const k=Math.cos(b.spinAngle+phase);
     ctx.beginPath();
     ctx.ellipse(p[0],p[1], Math.abs(k)*r, r, 0,0,Math.PI*2);
     ctx.stroke();
   }
   ctx.beginPath();
-  ctx.ellipse(p[0],p[1], r, r*0.28, 0,0,Math.PI*2);
+  ctx.ellipse(p[0],p[1], r, r*0.26, 0,0,Math.PI*2);
   ctx.stroke();
 
   ctx.restore();
 
-  ctx.beginPath(); ctx.arc(p[0],p[1],r,0,Math.PI*2);
-  ctx.lineWidth=2.6; ctx.strokeStyle=COL.ballDark; ctx.stroke();
-
-  // bloom highlight toward the sun
+  // soft highlight, no hard outline
   ctx.save();
-  ctx.shadowColor=COL.bloom; ctx.shadowBlur = REDUCED?0:10;
   ctx.beginPath();
-  ctx.arc(p[0]-r*0.32, p[1]-r*0.38, r*0.22, 0, Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fill();
+  ctx.arc(p[0]-r*0.3, p[1]-r*0.35, r*0.2, 0, Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,.55)'; ctx.fill();
   ctx.restore();
 }
 
-/* ---------------- aim preview: sparse small dots + landing ring (kept) ---------------- */
+/* ---------------- aim preview: sparse small dots + landing ring ---------------- */
 function drawAim(){
   if(game.live || game.power<=0.01) return;
   const pts=game.preview;
@@ -554,9 +483,9 @@ function drawAim(){
   const n=Math.max(3,Math.floor(pts.length*0.45));
   for(let i=0;i<n;i++){
     const t=i/n, q=proj(pts[i][0],pts[i][1],pts[i][2]);
-    ctx.globalAlpha=(1-t*0.8)*0.85;
-    ctx.beginPath(); ctx.arc(q[0],q[1], 2.6-1.1*t,0,Math.PI*2);
-    ctx.fillStyle=COL.ink; ctx.fill();
+    ctx.globalAlpha=(1-t*0.8)*0.8;
+    ctx.beginPath(); ctx.arc(q[0],q[1], 2.4-1.0*t,0,Math.PI*2);
+    ctx.fillStyle=COL.net; ctx.fill();
   }
   ctx.globalAlpha=1;
   if(game.previewLand){
@@ -564,7 +493,7 @@ function drawAim(){
     ctx.save(); ctx.globalAlpha=.85;
     ctx.beginPath();
     ctx.ellipse(l[0],l[1], 1.7*S, 1.7*S*PITCH, 0,0,Math.PI*2);
-    ctx.strokeStyle=COL.paint; ctx.lineWidth=3.5; ctx.setLineDash([7,6]); ctx.stroke();
+    ctx.strokeStyle=COL.rim; ctx.lineWidth=3; ctx.setLineDash([7,6]); ctx.stroke();
     ctx.setLineDash([]); ctx.restore();
   }
 }
@@ -573,8 +502,8 @@ function drawSpawnBadge(){
   const b=game.ball;
   const p=proj(b.x,b.y,b.z+2.1);
   ctx.beginPath(); ctx.arc(p[0],p[1],13,0,Math.PI*2);
-  ctx.fillStyle=COL.bg; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=COL.ink; ctx.stroke();
-  ctx.fillStyle=COL.ink; ctx.font='900 15px Archivo, sans-serif';
+  ctx.fillStyle=COL.board; ctx.fill();
+  ctx.fillStyle=COL.rim; ctx.font='900 15px Archivo, sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(game.spawnPts+'', p[0], p[1]+1);
 }
@@ -583,11 +512,10 @@ let flash=0;
 function drawFlash(){
   if(flash<=0) return;
   ctx.save(); ctx.globalAlpha=Math.min(1,flash);
-  ctx.fillStyle=COL.paint; ctx.font='900 62px Archivo, sans-serif';
+  ctx.fillStyle=COL.rim; ctx.font='900 62px Archivo, sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.lineWidth=7; ctx.strokeStyle=COL.ink;
   const txt='+'+game.spawnPts;
-  ctx.strokeText(txt, W/2, H*0.30); ctx.fillText(txt, W/2, H*0.30);
+  ctx.fillText(txt, W/2, H*0.30);
   ctx.restore();
 }
 
@@ -613,8 +541,7 @@ function frame(now){
   if(game.resetAt && now>=game.resetAt) spawnBall();
   if(flash>0) flash-=dt*1.4;
 
-  drawBackground(); drawCourt();
-  drawHoopShadow();
+  drawBackground();
   const netPre = netStrandsSplit();
   drawRimAndBackboard(netPre);
   drawAim();
