@@ -3,48 +3,82 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0FA45C">
+<meta name="theme-color" content="#F7F4EC">
 <title>Iso Hoops</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;overflow:hidden;background:#0FA45C;
+  html,body{width:100%;height:100%;overflow:hidden;background:#F7F4EC;
     font-family:Archivo,'Segoe UI',system-ui,sans-serif;
     -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
   #stage{position:fixed;inset:0;touch-action:none}
   canvas{display:block;width:100%;height:100%;touch-action:none}
-  .hud{position:fixed;pointer-events:none;color:#0B1A12}
+  .hud{position:fixed;pointer-events:none;color:#12213E}
   #score{top:calc(env(safe-area-inset-top,0px) + 14px);left:calc(env(safe-area-inset-left,0px) + 16px)}
-  #score .n{font-size:54px;font-weight:900;line-height:.92;color:#FFF6E2;
-    -webkit-text-stroke:3px #0B1A12;letter-spacing:-1px}
-  #score .s{margin-top:2px;font-size:13px;font-weight:700;color:#0B1A12;
-    background:#FFF6E2;border:2px solid #0B1A12;border-radius:999px;
-    padding:2px 9px;display:inline-block}
+  #score .n{font-size:52px;font-weight:900;line-height:.92;color:#D42E2E;
+    -webkit-text-stroke:2.5px #12213E;letter-spacing:-1px}
+  #score .s{margin-top:2px;font-size:13px;font-weight:700;color:#F7F4EC;
+    background:#12213E;border-radius:999px;padding:2px 9px;display:inline-block}
   #stage-pill{top:calc(env(safe-area-inset-top,0px) + 16px);right:calc(env(safe-area-inset-right,0px) + 16px);
     text-align:right}
   #stage-pill .p{font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;
-    background:#F5883C;border:2px solid #0B1A12;border-radius:999px;padding:5px 11px;display:inline-block;color:#0B1A12}
-  #readout{margin-top:6px;font-size:12px;font-weight:700;background:#FFF6E2;border:2px solid #0B1A12;
-    border-radius:999px;padding:3px 9px;display:inline-block;opacity:0;transition:opacity .15s}
-  #readout.on{opacity:1}
-  #hint{bottom:calc(env(safe-area-inset-bottom,0px) + 22px);left:0;right:0;text-align:center;
+    background:#1E52C7;border-radius:999px;padding:5px 11px;display:inline-block;color:#F7F4EC}
+  #hint{top:calc(env(safe-area-inset-top,0px) + 60px);left:0;right:0;text-align:center;
     transition:opacity .45s}
-  #hint span{font-size:13px;font-weight:700;background:#FFF6E2;border:2px solid #0B1A12;
+  #hint span{font-size:12.5px;font-weight:700;background:#12213E;color:#F7F4EC;
     border-radius:999px;padding:6px 14px;display:inline-block}
   #hint.gone{opacity:0}
-  #splash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-    background:rgba(15,164,92,.92);z-index:5}
-  #splash b{font-size:40px;font-weight:900;color:#FFF6E2;-webkit-text-stroke:3px #0B1A12}
+
+  /* ---- control panel: sliders + buttons, no touch-drag on the court ---- */
+  #panel{position:fixed;left:0;right:0;bottom:0;padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 12px);
+    background:linear-gradient(to top, rgba(18,33,62,.97), rgba(18,33,62,.90));
+    display:flex;flex-direction:column;gap:9px;z-index:4}
+  .row{display:flex;align-items:center;gap:8px}
+  .row label{width:56px;flex:0 0 auto;font-size:11.5px;font-weight:900;letter-spacing:.5px;
+    color:#F7F4EC;text-transform:uppercase}
+  .stepbtn{width:32px;height:32px;flex:0 0 auto;border-radius:9px;border:none;
+    background:#1E52C7;color:#F7F4EC;font-size:17px;font-weight:900;line-height:1;
+    display:flex;align-items:center;justify-content:center}
+  .stepbtn:active{background:#163d99}
+  input[type=range]{flex:1 1 auto;height:34px;-webkit-appearance:none;background:transparent}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:5px;background:#2b3f68}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;
+    background:#D42E2E;border:3px solid #F7F4EC;margin-top:-9px}
+  .readout{width:44px;flex:0 0 auto;text-align:right;font-size:13px;font-weight:900;color:#F7F4EC}
+  #shootBtn{width:100%;height:52px;border:none;border-radius:14px;
+    background:#D42E2E;color:#F7F4EC;font-size:18px;font-weight:900;letter-spacing:1px;
+    text-transform:uppercase;box-shadow:0 4px 0 #8f1c1c}
+  #shootBtn:active{transform:translateY(2px);box-shadow:0 2px 0 #8f1c1c}
+  #shootBtn:disabled{background:#5a6685;box-shadow:0 4px 0 #3c4460;color:#c3c9d8}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <div id="stage"><canvas id="c"></canvas></div>
 <div class="hud" id="score"><div class="n" id="scoreN">0</div><div class="s" id="scoreS">0 / 0</div></div>
-<div class="hud" id="stage-pill"><div class="p" id="stageP">STAGE 1 · STATIC</div><div id="readout"></div></div>
-<div class="hud" id="hint"><span>Drag back anywhere to aim &amp; shoot</span></div>
+<div class="hud" id="stage-pill"><div class="p" id="stageP">STAGE 1 · STATIC</div></div>
+<div class="hud" id="hint"><span>Dial in the aim &amp; power, then Shoot</span></div>
+
+<div id="panel">
+  <div class="row">
+    <label>Aim</label>
+    <button class="stepbtn" id="aimDown">&#8249;</button>
+    <input type="range" id="aimSlider" min="-45" max="45" step="1" value="0">
+    <button class="stepbtn" id="aimUp">&#8250;</button>
+    <div class="readout" id="aimReadout">0°</div>
+  </div>
+  <div class="row">
+    <label>Power</label>
+    <button class="stepbtn" id="powDown">&minus;</button>
+    <input type="range" id="powSlider" min="0" max="100" step="1" value="55">
+    <button class="stepbtn" id="powUp">&#43;</button>
+    <div class="readout" id="powReadout">55%</div>
+  </div>
+  <button id="shootBtn">Shoot</button>
+</div>
+
 <script>
 (function(){
 "use strict";
@@ -58,7 +92,7 @@ const G = 32.17, DT = 1/240;
 // above the ring and gives a ~55deg entry, which the ball actually fits through.
 const LAUNCH_DEG = 70;
 const LAUNCH = LAUNCH_DEG * Math.PI/180;
-const MAX_DRAG = 150, MAX_SPEED = 46;
+const MAX_SPEED = 46;
 
 const BASELINE = -5.25, HALFWAY = 41.75, SIDE = 25;
 const KEY_HW = 8, FT_Y = 13.75, FT_R = 6, RA_R = 4;
@@ -66,14 +100,20 @@ const TP_X = 22, TP_R = 23.75, TP_STRAIGHT = Math.sqrt(TP_R*TP_R - TP_X*TP_X);
 const RIM_R = 0.75, RIM_Z = 10, BALL_R = 0.39;
 const BB_W = 6, BB_H = 3.5, BB_OFF = 1.25;
 
-const APRON_X = 29, APRON_BACK = -10.5, APRON_FRONT = 43.5, SLAB_H = 2.2;
+const APRON_X = 29, APRON_BACK = -10.5, APRON_FRONT = 43.5;
 
+// Evening-sun palette: warm white infinite canvas, a red/navy split court,
+// hard offset shadows from one fixed light direction, real basketball orange.
 const COL = {
-  bg:'#0FA45C', grid:'#0A7D45', ink:'#0B1A12', cream:'#FFF6E2',
-  floor:'#1BA37C', floorDeep:'#148467',
-  apron:'#F5883C', apronSide:'#D9641F', ball:'#F2A03D', ballDark:'#D9641F',
-  fence:'#0C8A4E', shadow:'rgba(6,26,16,.30)'
+  bg:'#F7F4EC', grid:'#EAE3D2', ink:'#12213E',
+  paint:'#D42E2E', paintDeep:'#A81F1F',
+  navy:'#1E3A73', navyDeep:'#12213E',
+  line:'#F7F4EC', lineShadow:'rgba(18,33,62,.28)',
+  ball:'#E8681F', ballDark:'#B8460F', seam:'#12213E',
+  net:'#F7F4EC', rim:'#D42E2E', rimDark:'#8f1c1c',
+  sun:'rgba(255,196,102,.35)', bloom:'rgba(255,214,140,.9)'
 };
+const LIGHT_DX = 0.62, LIGHT_DY = -0.5; // evening sun: upper-right, casts shadow down-left
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------------- canvas / camera ---------------- */
@@ -87,9 +127,6 @@ function resize(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   fitCamera();
 }
-
-// Fit the rotated bounding box of the playable slab. ZOOM>1 crops the
-// harmless apron corners so the court actually fills the screen.
 const ZOOM = 1.86;
 function fitCamera(){
   const pts=[[-APRON_X,APRON_BACK],[APRON_X,APRON_BACK],[APRON_X,APRON_FRONT],[-APRON_X,APRON_FRONT]];
@@ -99,24 +136,15 @@ function fitCamera(){
     minx=Math.min(minx,rx); maxx=Math.max(maxx,rx);
     miny=Math.min(miny,ry); maxy=Math.max(maxy,ry);
   }
-  // headroom above the floor for the hoop + the shot arc
   const top = miny - (RIM_Z + 3.5);
   const sx = W/(maxx-minx), sy = H/(maxy-top);
-  // Portrait screens are tall and narrow: let the harmless apron corners
-  // run off the sides rather than sitting far away from the action.
   S = Math.min(sx*ZOOM, sy*1.42);
   camX = W/2 - ((minx+maxx)/2)*S;
   camY = H/2 - ((top+maxy)/2)*S + H*0.02;
 }
-
 function proj(x,y,z){
   const rx = x*CY - y*SY, ry = x*SY + y*CY;
   return [rx*S + camX, ry*S*PITCH - z*S + camY];
-}
-// screen delta -> ground-plane delta (inverse of proj at z=0)
-function unproj(dx,dy){
-  const rx = dx/S, ry = dy/(S*PITCH);
-  return [rx*CY + ry*SY, -rx*SY + ry*CY];
 }
 
 /* ---------------- hoop (moving target) ---------------- */
@@ -167,7 +195,6 @@ function rollHoop(){
   hoop.tilt  = i>=3 ? R(0.17) : 0;
   hoop.driftAmp = i>=4 ? 4.5  : 0;
   hoop.driftPhase = Math.random()*Math.PI*2;
-  // keep the rim on the court
   hoop.x = Math.max(-SIDE+6-hoop.baseX, Math.min(SIDE-6-hoop.baseX, hoop.x));
   document.getElementById('stageP').textContent = 'STAGE '+(i+1)+' · '+STAGES[i].name;
 }
@@ -175,10 +202,11 @@ function rollHoop(){
 /* ---------------- game state ---------------- */
 const game = {
   score:0, makes:0, attempts:0,
-  ball:{x:0,y:12,z:BALL_R,vx:0,vy:0,vz:0},
-  live:false, rest:0, spawnPts:2, madeAt:0, resetAt:0,
-  aiming:false, aimStart:[0,0], aimNow:[0,0], power:0, dir:[0,1],
-  preview:null, previewLand:null, dragged:false
+  ball:{x:0,y:12,z:BALL_R,vx:0,vy:0,vz:0,
+        spinAngle:0, spinRate:0, spinPhaseX:0, spinPhaseY:2.1},
+  live:false, resetAt:0, spawnPts:2,
+  aimDeg:0, power:0.55,
+  preview:null, previewLand:null
 };
 
 function pointValue(x,y){
@@ -191,21 +219,20 @@ function pointValue(x,y){
 
 function spawnBall(){
   rollHoop();
-  // Spawn only where the ball is comfortably on screen: the camera crops the
-  // apron corners, so a purely random court point could land out of view.
   let x=0,y=12,tries=0;
   while(tries++ < 200){
     const cx = (Math.random()*2-1)*(SIDE-2.5);
     const cy = 1.5 + Math.random()*27;
     if(Math.hypot(cx-hoop.cx, cy) < 4.5) continue;
     const p = proj(cx,cy,0);
-    if(p[0]<70 || p[0]>W-70 || p[1]<H*0.18 || p[1]>H-150) continue;
+    if(p[0]<70 || p[0]>W-70 || p[1]<H*0.18 || p[1]>H-220) continue;
     x=cx; y=cy; break;
   }
   const b=game.ball;
-  b.x=x; b.y=y; b.z=BALL_R; b.vx=b.vy=b.vz=0;
+  b.x=x; b.y=y; b.z=BALL_R; b.vx=b.vy=b.vz=0; b.spinRate=0;
   game.spawnPts = pointValue(x,y);
-  game.live=false; game.rest=0; game.madeAt=0; game.resetAt=0;
+  game.live=false; game.resetAt=0;
+  shootBtn.disabled=false;
   computePreview();
 }
 
@@ -213,6 +240,11 @@ function spawnBall(){
 function stepBall(b, dt, detect){
   b.vz -= G*dt;
   b.x += b.vx*dt; b.y += b.vy*dt; b.z += b.vz*dt;
+
+  // spin: rolls proportional to horizontal speed, decays toward it
+  const targetRate = Math.hypot(b.vx,b.vy)/BALL_R;
+  b.spinRate += (targetRate-b.spinRate)*Math.min(1,dt*6);
+  b.spinAngle += b.spinRate*dt;
 
   // rim ring
   const L = local([b.x,b.y,b.z]);
@@ -229,17 +261,16 @@ function stepBall(b, dt, detect){
       const pen = BALL_R-dist;
       b.x += nw[0]*pen; b.y += nw[1]*pen; b.z += nw[2]*pen;
       const vn = b.vx*nw[0]+b.vy*nw[1]+b.vz*nw[2];
-      if(vn<0){ const j=-(1+0.48)*vn; b.vx+=nw[0]*j; b.vy+=nw[1]*j; b.vz+=nw[2]*j; b._hit='rim'; }
+      if(vn<0){ const j=-(1+0.48)*vn; b.vx+=nw[0]*j; b.vy+=nw[1]*j; b.vz+=nw[2]*j; b._hit='rim'; b.spinRate+=(Math.random()*2-1)*4; }
     }
   }
 
-  // scoring: cross the rim plane downward, inside the ring
   if(detect && b._pn!==undefined){
     if(b._pn>0 && L[2]<=0 && r < RIM_R - BALL_R*0.45) return 'make';
   }
   b._pn = L[2];
 
-  // backboard plane (local v = out toward court)
+  // backboard plane
   const bu = L[0], bv = L[1], bn = L[2];
   if(bv > -BB_OFF-0.9 && bv < -BB_OFF+BALL_R && Math.abs(bu) < BB_W/2 && bn > -0.6 && bn < BB_H){
     const vv = b.vx*hoop.v[0]+b.vy*hoop.v[1]+b.vz*hoop.v[2];
@@ -261,78 +292,72 @@ function stepBall(b, dt, detect){
   return null;
 }
 
-/* ---------------- aiming preview ---------------- */
+/* ---------------- aiming preview (driven by sliders, not touch) ---------------- */
+function currentDir(){
+  const b=game.ball;
+  const baseA = Math.atan2(hoop.cy-b.y, hoop.cx-b.x);
+  const a = baseA + game.aimDeg*Math.PI/180;
+  return [Math.cos(a), Math.sin(a)];
+}
 function launchVector(){
+  const dir = currentDir();
   const sp = game.power*MAX_SPEED;
   const h = sp*Math.cos(LAUNCH), z = sp*Math.sin(LAUNCH);
-  return [game.dir[0]*h, game.dir[1]*h, z];
+  return [dir[0]*h, dir[1]*h, z];
 }
 function computePreview(){
-  if(game.power<=0.001){ game.preview=null; game.previewLand=null; return; }
   const b=game.ball, v=launchVector();
   const sim={x:b.x,y:b.y,z:b.z,vx:v[0],vy:v[1],vz:v[2]};
   const pts=[]; let land=null;
   for(let i=0;i<240*4;i++){
-    // preview against the hoop as it is *now* (no look-ahead cheating)
     stepBall(sim, DT, false);
-    if(i%4===0) pts.push([sim.x,sim.y,sim.z]);
+    if(i%6===0) pts.push([sim.x,sim.y,sim.z]);
     if(!land && sim.z<=BALL_R+0.02 && sim.vz<=0 && i>20) land=[sim.x,sim.y];
     if(land) break;
   }
   game.preview=pts; game.previewLand=land;
 }
 
-/* ---------------- input ---------------- */
-const stage=document.getElementById('stage');
-const hint=document.getElementById('hint'), readout=document.getElementById('readout');
-function pos(e){ const t=e.touches?e.touches[0]:e; return [t.clientX,t.clientY]; }
+/* ---------------- controls: sliders + step buttons + shoot ---------------- */
+const aimSlider=document.getElementById('aimSlider'), powSlider=document.getElementById('powSlider');
+const aimReadout=document.getElementById('aimReadout'), powReadout=document.getElementById('powReadout');
+const shootBtn=document.getElementById('shootBtn');
+const hint=document.getElementById('hint');
+let interacted=false;
 
-function down(e){
-  if(game.live) return;
-  e.preventDefault();
-  game.aiming=true; game.aimStart=pos(e); game.aimNow=game.aimStart;
-  game.power=0; updateAim();
-}
-function move(e){
-  if(!game.aiming) return;
-  e.preventDefault();
-  game.aimNow=pos(e); updateAim();
-  if(!game.dragged){ game.dragged=true; hint.classList.add('gone'); }
-}
-function up(e){
-  if(!game.aiming) return;
-  e.preventDefault();
-  game.aiming=false; readout.classList.remove('on');
-  if(game.power>0.06) shoot(); else { game.power=0; game.preview=null; }
-}
-function updateAim(){
-  // slingshot: drag BACK, the ball goes the other way
-  const dx = game.aimStart[0]-game.aimNow[0], dy = game.aimStart[1]-game.aimNow[1];
-  const len = Math.hypot(dx,dy);
-  game.power = Math.min(len/MAX_DRAG, 1);
-  if(len>4){
-    const g = unproj(dx,dy);
-    const gl = Math.hypot(g[0],g[1]);
-    game.dir = [g[0]/gl, g[1]/gl];
-  }
+function onAimChange(){
+  game.aimDeg = +aimSlider.value;
+  aimReadout.textContent = (game.aimDeg>0?'+':'')+game.aimDeg+'°';
   computePreview();
-  readout.classList.add('on');
-  readout.textContent = Math.round(game.power*100)+'% · '+LAUNCH_DEG+'°';
+  noteInteract();
 }
+function onPowChange(){
+  game.power = (+powSlider.value)/100;
+  powReadout.textContent = powSlider.value+'%';
+  computePreview();
+  noteInteract();
+}
+function noteInteract(){ if(!interacted){ interacted=true; hint.classList.add('gone'); } }
+function step(slider,delta,handler){
+  slider.value = Math.max(+slider.min, Math.min(+slider.max, (+slider.value)+delta));
+  handler();
+}
+aimSlider.addEventListener('input', onAimChange);
+powSlider.addEventListener('input', onPowChange);
+document.getElementById('aimDown').addEventListener('click', ()=>step(aimSlider,-5,onAimChange));
+document.getElementById('aimUp').addEventListener('click', ()=>step(aimSlider, 5,onAimChange));
+document.getElementById('powDown').addEventListener('click', ()=>step(powSlider,-5,onPowChange));
+document.getElementById('powUp').addEventListener('click', ()=>step(powSlider, 5,onPowChange));
+shootBtn.addEventListener('click', shoot);
+
 function shoot(){
+  if(game.live || shootBtn.disabled) return;
   const v=launchVector(); const b=game.ball;
   b.vx=v[0]; b.vy=v[1]; b.vz=v[2]; b._pn=undefined;
   game.live=true; game.attempts++; game.preview=null; game.previewLand=null;
+  shootBtn.disabled=true;
   syncHUD();
 }
-stage.addEventListener('touchstart',down,{passive:false});
-stage.addEventListener('touchmove',move,{passive:false});
-stage.addEventListener('touchend',up,{passive:false});
-stage.addEventListener('touchcancel',up,{passive:false});
-stage.addEventListener('mousedown',down);
-window.addEventListener('mousemove',move);
-window.addEventListener('mouseup',up);
-
 function syncHUD(){
   document.getElementById('scoreN').textContent = game.score;
   document.getElementById('scoreS').textContent = game.makes+' / '+game.attempts;
@@ -355,113 +380,100 @@ function arcPts(cx,cy,r,a0,a1,n){
   return out;
 }
 function groundLine(x0,y0,x1,y1){ return [proj(x0,y0,0), proj(x1,y1,0)]; }
+// hard offset shadow direction of a fixed evening sun (no blur, sharp silhouette)
+function shadowOffset(){ return [22*LIGHT_DX, 22*-LIGHT_DY]; }
 
-/* ---------------- court ---------------- */
+/* ---------------- background: white canvas, lattice, evening sun ---------------- */
 function drawBackground(){
   ctx.fillStyle=COL.bg; ctx.fillRect(0,0,W,H);
-  // faint isometric lattice
-  ctx.strokeStyle=COL.grid; ctx.lineWidth=1.5; ctx.globalAlpha=.55;
+  const g = ctx.createRadialGradient(W*0.86,H*0.1,0, W*0.86,H*0.1, Math.max(W,H)*0.95);
+  g.addColorStop(0, COL.sun); g.addColorStop(1,'rgba(255,196,102,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle=COL.grid; ctx.lineWidth=1.4;
   const step=10, ext=90;
   ctx.beginPath();
   for(let x=-ext;x<=ext;x+=step){ const a=proj(x,-ext,0), b=proj(x,ext,0); mv(a); ln(b); }
   for(let y=-ext;y<=ext;y+=step){ const a=proj(-ext,y,0), b=proj(ext,y,0); mv(a); ln(b); }
-  ctx.stroke(); ctx.globalAlpha=1;
+  ctx.stroke();
 }
 
-function slabTop(){
-  return [proj(-APRON_X,APRON_BACK,0),proj(APRON_X,APRON_BACK,0),
-          proj(APRON_X,APRON_FRONT,0),proj(-APRON_X,APRON_FRONT,0)];
-}
-function drawSlab(){
-  const t=slabTop();
-  // drop shadow
-  ctx.save(); ctx.globalAlpha=.85;
-  inkFill(t.map(p=>[p[0]+18,p[1]+64]), 'rgba(7,28,17,.55)', 0);
+/* ---------------- court: red/navy split, hard shadow, white lines ---------------- */
+function drawCourt(){
+  const off = shadowOffset();
+  const outline=[proj(-SIDE,BASELINE,0),proj(SIDE,BASELINE,0),proj(SIDE,HALFWAY,0),proj(-SIDE,HALFWAY,0)];
+
+  ctx.save();
+  const shadowPts = outline.map(p=>[p[0]+off[0], p[1]+off[1]]);
+  inkFill(shadowPts, 'rgba(18,33,62,.22)', 0);
   ctx.restore();
-  // extruded side (front-left + front-right faces)
-  const d=SLAB_H*S;
-  const side=[t[1],t[2],t[3],[t[3][0],t[3][1]+d],[t[2][0],t[2][1]+d],[t[1][0],t[1][1]+d]];
-  inkFill(side, COL.apronSide, 4);
-  // orange apron top
-  inkFill(t, COL.apron, 4);
-  // teal playing surface
-  const pl=[proj(-SIDE-1.5,BASELINE-1.5,0),proj(SIDE+1.5,BASELINE-1.5,0),
-            proj(SIDE+1.5,HALFWAY,0),proj(-SIDE-1.5,HALFWAY,0)];
-  inkFill(pl, COL.floor, 4);
-}
 
+  inkFill(outline, COL.navy, 5);
+  const diag=[proj(-SIDE,BASELINE,0),proj(SIDE,BASELINE,0),proj(SIDE,FT_Y+6,0),proj(-SIDE,FT_Y-6,0)];
+  inkFill(diag, COL.paint, 0);
+
+  courtLines();
+}
 function courtLines(){
-  const draw=(pts,off)=>{ strokePts(pts.map(p=>[p[0]+off[0],p[1]+off[1]]), off[2], off[3]); };
   const sets=[];
   sets.push(groundLine(-SIDE,BASELINE,SIDE,BASELINE));
   sets.push(groundLine(-SIDE,BASELINE,-SIDE,HALFWAY));
   sets.push(groundLine(SIDE,BASELINE,SIDE,HALFWAY));
   sets.push(groundLine(-SIDE,HALFWAY,SIDE,HALFWAY));
-  // key
   sets.push([proj(-KEY_HW,BASELINE,0),proj(-KEY_HW,FT_Y,0),proj(KEY_HW,FT_Y,0),proj(KEY_HW,BASELINE,0)]);
   sets.push(arcPts(0,FT_Y,FT_R,0,Math.PI*2,48));
   sets.push(arcPts(hoop.baseX,0,RA_R,0,Math.PI,24));
-  // three point
   sets.push(groundLine(-TP_X,BASELINE,-TP_X,TP_STRAIGHT));
   sets.push(groundLine(TP_X,BASELINE,TP_X,TP_STRAIGHT));
   const a0=Math.atan2(TP_STRAIGHT,TP_X);
   sets.push(arcPts(0,0,TP_R,a0,Math.PI-a0,60));
-  // centre circle at halfway
   sets.push(arcPts(0,HALFWAY,FT_R,Math.PI,Math.PI*2,40));
-
-  // soft offset shadow copy, then cream lines
-  for(const s of sets) draw(s,[3,7,'rgba(9,70,45,.45)',5]);
-  for(const s of sets) strokePts(s, COL.cream, 5);
+  for(const s of sets) strokePts(s.map(p=>[p[0]+3,p[1]+5]), COL.lineShadow, 5);
+  for(const s of sets) strokePts(s, COL.line, 4.5);
 }
 
-/* ---------------- fence (back + left, like the reference) ---------------- */
-function fenceRun(x0,y0,x1,y1,h){
-  const steps=10;
-  ctx.save();
-  // mesh
-  ctx.strokeStyle='rgba(8,70,42,.55)'; ctx.lineWidth=1.4;
-  ctx.beginPath();
-  for(let i=0;i<=steps*3;i++){
-    const t=i/(steps*3);
-    const x=x0+(x1-x0)*t, y=y0+(y1-y0)*t;
-    mv(proj(x,y,0)); ln(proj(x,y,h));
-  }
-  for(let k=0;k<=6;k++){
-    const z=h*k/6;
-    mv(proj(x0,y0,z)); ln(proj(x1,y1,z));
-  }
-  ctx.stroke();
-  // posts + rails
-  ctx.strokeStyle=COL.ink; ctx.lineWidth=3.5; ctx.lineCap='round';
-  ctx.beginPath();
-  for(let i=0;i<=steps;i++){
-    const t=i/steps, x=x0+(x1-x0)*t, y=y0+(y1-y0)*t;
-    mv(proj(x,y,0)); ln(proj(x,y,h));
-  }
-  mv(proj(x0,y0,h)); ln(proj(x1,y1,h));
-  mv(proj(x0,y0,0)); ln(proj(x1,y1,0));
-  ctx.stroke();
+/* ---------------- hoop: real rim hole, sorted net, hard shadow, bloom ---------------- */
+function drawHoopShadow(){
+  const off = shadowOffset();
+  ctx.save(); ctx.globalAlpha=.28;
+  const sp=arcPts(hoop.cx,hoop.cy,RIM_R*1.5,0,Math.PI*2,20).map(p=>[p[0]+off[0]*0.6,p[1]+off[1]*0.6]);
+  polyPath(sp); ctx.fillStyle=COL.navyDeep; ctx.fill();
   ctx.restore();
 }
-function drawFence(){
-  fenceRun(-APRON_X,APRON_BACK,APRON_X,APRON_BACK,13);
-  fenceRun(-APRON_X,APRON_BACK,-APRON_X,26,13);
+function netStrandsSplit(){
+  const back=[], front=[];
+  const N=14;
+  for(let i=0;i<N;i++){
+    const a=i/N*Math.PI*2;
+    const p=rimPoint(a);
+    const q=rimPoint(a+Math.PI*2/N*0.5);
+    const mid = Math.sin(a); // local-v component: negative side faces the camera
+    const seg = {p, bottom:[hoop.cx+(q[0]-hoop.cx)*0.5, hoop.cy+(q[1]-hoop.cy)*0.5, p[2]-2.4]};
+    (mid<0 ? front : back).push(seg);
+  }
+  return {front,back};
 }
-
-/* ---------------- hoop ---------------- */
-function drawHoop(){
+function drawNetStrands(list){
+  if(!list.length) return;
+  ctx.strokeStyle=COL.net; ctx.lineWidth=2; ctx.beginPath();
+  for(const seg of list){ mv(proj(seg.p[0],seg.p[1],seg.p[2])); ln(proj(seg.bottom[0],seg.bottom[1],seg.bottom[2])); }
+  ctx.stroke();
+  ctx.beginPath();
+  const n=list.length;
+  for(let i=0;i<n;i++){
+    const a=list[i], bnext=list[(i+1)%n];
+    const t=0.55;
+    const pa=[a.p[0]+(a.bottom[0]-a.p[0])*t, a.p[1]+(a.bottom[1]-a.p[1])*t, a.p[2]+(a.bottom[2]-a.p[2])*t];
+    const pb=[bnext.p[0]+(bnext.bottom[0]-bnext.p[0])*t, bnext.p[1]+(bnext.bottom[1]-bnext.p[1])*t, bnext.p[2]+(bnext.bottom[2]-bnext.p[2])*t];
+    mv(proj(pa[0],pa[1],pa[2])); ln(proj(pb[0],pb[1],pb[2]));
+  }
+  ctx.stroke();
+}
+function drawRimAndBackboard(pre){
   const post = proj(hoop.cx, -BB_OFF-1.4, 0);
   const postTop = proj(hoop.cx, -BB_OFF-1.4, RIM_Z+BB_H);
-  // ground shadow of the rim
-  ctx.save(); ctx.globalAlpha=.35;
-  ctx.beginPath();
-  const sp=arcPts(hoop.cx,hoop.cy,RIM_R*1.5,0,Math.PI*2,20);
-  polyPath(sp); ctx.fillStyle='rgba(5,30,18,.6)'; ctx.fill();
-  ctx.restore();
-  // stanchion
   strokePts([post,postTop], COL.ink, 8);
 
-  // backboard as a quad in the rim basis
   const corner=(u,n)=>{
     const bx=hoop.cx + u*hoop.u[0] + (-BB_OFF)*hoop.v[0] + n*hoop.n[0];
     const by=hoop.cy + u*hoop.u[1] + (-BB_OFF)*hoop.v[1] + n*hoop.n[1];
@@ -469,132 +481,113 @@ function drawHoop(){
     return proj(bx,by,bz);
   };
   const bb=[corner(-BB_W/2,-0.4),corner(BB_W/2,-0.4),corner(BB_W/2,BB_H),corner(-BB_W/2,BB_H)];
-  inkFill(bb, '#17795A', 4);
+  inkFill(bb, '#F7F4EC', 4);
   const inner=[corner(-1.0,-0.1),corner(1.0,-0.1),corner(1.0,1.5),corner(-1.0,1.5)];
-  polyPath(inner); ctx.strokeStyle=COL.cream; ctx.lineWidth=3.5; ctx.stroke();
+  polyPath(inner); ctx.strokeStyle=COL.paint; ctx.lineWidth=3.5; ctx.stroke();
 
-  // net
-  ctx.strokeStyle=COL.cream; ctx.lineWidth=2;
-  ctx.beginPath();
-  for(let i=0;i<12;i++){
-    const a=i/12*Math.PI*2;
-    const p=rimPoint(a);
-    const q=rimPoint(a+0.5);
-    mv(proj(p[0],p[1],p[2]));
-    ln(proj(hoop.cx+(q[0]-hoop.cx)*0.55, hoop.cy+(q[1]-hoop.cy)*0.55, p[2]-2.6));
-  }
-  ctx.stroke();
-  // rim
+  drawNetStrands(pre.back);
+
+  // rim ring drawn as a thick torus so the hole reads clearly, with a bloom glow
+  ctx.save();
+  ctx.shadowColor=COL.bloom; ctx.shadowBlur = REDUCED?0:14;
   const ring=[]; for(let i=0;i<=40;i++){ const p=rimPoint(i/40*Math.PI*2); ring.push(proj(p[0],p[1],p[2])); }
-  strokePts(ring, COL.ink, 7);
-  strokePts(ring, COL.apronSide, 4);
+  strokePts(ring, COL.rimDark, 8);
+  strokePts(ring, COL.rim, 5);
+  ctx.restore();
+
+  drawNetStrands(pre.front);
 }
 
-/* ---------------- ball + aim ---------------- */
-function drawShadow(x,y,z){
-  const shrink = Math.max(0.35, 1 - z/26);
+/* ---------------- ball: real basketball with spinning seams + hard shadow + bloom rim light ---------------- */
+function drawBallShadow(x,y,z){
+  const off = shadowOffset();
+  const shrink = Math.max(0.32, 1 - z/26);
   const p=proj(x,y,0);
+  const sr=Math.max(BALL_R*S*1.6,10)*1.15*shrink;
   ctx.save(); ctx.globalAlpha=.30*shrink+0.08;
   ctx.beginPath();
-  const sr=Math.max(BALL_R*S*1.6,10)*1.25*shrink;
-  ctx.ellipse(p[0],p[1],sr, sr*PITCH,0,0,Math.PI*2);
-  ctx.fillStyle='#062A19'; ctx.fill(); ctx.restore();
+  ctx.ellipse(p[0]+off[0]*0.5*shrink,p[1]+off[1]*0.5*shrink, sr, sr*PITCH,0,0,Math.PI*2);
+  ctx.fillStyle=COL.navyDeep; ctx.fill(); ctx.restore();
 }
 function drawBall(){
   const b=game.ball;
-  drawShadow(b.x,b.y,b.z);
+  drawBallShadow(b.x,b.y,b.z);
   const p=proj(b.x,b.y,b.z), r=Math.max(BALL_R*S*1.6, 10);
-  ctx.beginPath(); ctx.arc(p[0],p[1],r,0,Math.PI*2);
-  ctx.fillStyle=COL.ball; ctx.fill();
-  ctx.lineWidth=3.5; ctx.strokeStyle=COL.ink; ctx.stroke();
-  // seams
-  ctx.beginPath();
-  ctx.moveTo(p[0]-r,p[1]); ctx.lineTo(p[0]+r,p[1]);
-  ctx.moveTo(p[0],p[1]-r); ctx.lineTo(p[0],p[1]+r);
-  ctx.lineWidth=2; ctx.strokeStyle=COL.ballDark; ctx.stroke();
-}
-function drawAim(){
-  if(!game.aiming || game.power<=0.02) return;
-  const b=game.ball;
-  const p0=proj(b.x,b.y,b.z);
 
-  // ground direction guide — shows exactly where the shot is pointed
-  const gx=b.x+game.dir[0]*12, gy=b.y+game.dir[1]*12;
-  strokePts([proj(b.x,b.y,0),proj(gx,gy,0)], 'rgba(255,246,226,.55)', 4);
-  // arrow head
-  const ah=proj(gx,gy,0), back=proj(b.x+game.dir[0]*9.6, b.y+game.dir[1]*9.6,0);
-  strokePts([back,ah], COL.cream, 6);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(p[0],p[1],r,0,Math.PI*2); ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle=COL.ball; ctx.fillRect(p[0]-r,p[1]-r,r*2,r*2);
 
-  // Ground track of the WHOLE flight (faint) — this is the readable part:
-  // it shows the shot's direction and how far it carries.
-  const pts=game.preview;
-  if(pts&&pts.length){
-    ctx.save(); ctx.globalAlpha=.45;
+  // spinning seams: two rotating longitude bands (the classic 2D trick of
+  // squashing an ellipse by cos(spin angle)) plus a near-fixed equator.
+  ctx.strokeStyle=COL.seam; ctx.lineWidth=Math.max(1.6, r*0.09);
+  for(const phase of [b.spinPhaseX, b.spinPhaseX+Math.PI/2]){
+    const k=Math.cos(b.spinAngle+phase);
     ctx.beginPath();
-    for(let i=0;i<pts.length;i++){
-      const g=proj(pts[i][0],pts[i][1],0);
-      i? ctx.lineTo(g[0],g[1]) : ctx.moveTo(g[0],g[1]);
-    }
-    ctx.strokeStyle='#08512F'; ctx.lineWidth=3; ctx.setLineDash([8,8]); ctx.stroke();
-    ctx.setLineDash([]); ctx.restore();
-
-    // Arc dots, first 45% of the flight, fading out.
-    const n=Math.max(4,Math.floor(pts.length*0.45));
-    for(let i=0;i<n;i++){
-      const t=i/n, q=proj(pts[i][0],pts[i][1],pts[i][2]);
-      ctx.globalAlpha=1-t*0.85;
-      ctx.beginPath(); ctx.arc(q[0],q[1], 6-3.2*t,0,Math.PI*2);
-      ctx.fillStyle=COL.cream; ctx.fill();
-      ctx.lineWidth=1.6; ctx.strokeStyle=COL.ink; ctx.stroke();
-    }
-    ctx.globalAlpha=1;
+    ctx.ellipse(p[0],p[1], Math.abs(k)*r, r, 0,0,Math.PI*2);
+    ctx.stroke();
   }
-  // predicted landing marker
+  ctx.beginPath();
+  ctx.ellipse(p[0],p[1], r, r*0.28, 0,0,Math.PI*2);
+  ctx.stroke();
+
+  ctx.restore();
+
+  ctx.beginPath(); ctx.arc(p[0],p[1],r,0,Math.PI*2);
+  ctx.lineWidth=2.6; ctx.strokeStyle=COL.ballDark; ctx.stroke();
+
+  // bloom highlight toward the sun
+  ctx.save();
+  ctx.shadowColor=COL.bloom; ctx.shadowBlur = REDUCED?0:10;
+  ctx.beginPath();
+  ctx.arc(p[0]-r*0.32, p[1]-r*0.38, r*0.22, 0, Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fill();
+  ctx.restore();
+}
+
+/* ---------------- aim preview: sparse small dots + landing ring (kept) ---------------- */
+function drawAim(){
+  if(game.live || game.power<=0.01) return;
+  const pts=game.preview;
+  if(!pts||!pts.length) return;
+  const n=Math.max(3,Math.floor(pts.length*0.45));
+  for(let i=0;i<n;i++){
+    const t=i/n, q=proj(pts[i][0],pts[i][1],pts[i][2]);
+    ctx.globalAlpha=(1-t*0.8)*0.85;
+    ctx.beginPath(); ctx.arc(q[0],q[1], 2.6-1.1*t,0,Math.PI*2);
+    ctx.fillStyle=COL.ink; ctx.fill();
+  }
+  ctx.globalAlpha=1;
   if(game.previewLand){
     const l=proj(game.previewLand[0],game.previewLand[1],0);
-    ctx.save(); ctx.globalAlpha=.9;
+    ctx.save(); ctx.globalAlpha=.85;
     ctx.beginPath();
     ctx.ellipse(l[0],l[1], 1.7*S, 1.7*S*PITCH, 0,0,Math.PI*2);
-    ctx.strokeStyle=COL.cream; ctx.lineWidth=3.5; ctx.setLineDash([7,6]); ctx.stroke();
+    ctx.strokeStyle=COL.paint; ctx.lineWidth=3.5; ctx.setLineDash([7,6]); ctx.stroke();
     ctx.setLineDash([]); ctx.restore();
   }
-  // rim lights up when the aim is lined up with the hoop
-  const toH=Math.atan2(hoop.cy-b.y, hoop.cx-b.x);
-  const aimA=Math.atan2(game.dir[1],game.dir[0]);
-  let da=Math.abs(((aimA-toH+Math.PI*3)%(Math.PI*2))-Math.PI);
-  if(da<0.075){
-    const ring=[]; for(let i=0;i<=40;i++){ const q=rimPoint(i/40*Math.PI*2); ring.push(proj(q[0],q[1],q[2])); }
-    ctx.save(); ctx.globalAlpha=1-da/0.075;
-    strokePts(ring, COL.cream, 11); ctx.restore();
-  }
-  // power ring around the ball
-  const r=Math.max(BALL_R*S*1.6,10)+12;
-  ctx.beginPath(); ctx.arc(p0[0],p0[1],r,0,Math.PI*2);
-  ctx.strokeStyle='rgba(11,26,18,.35)'; ctx.lineWidth=6; ctx.stroke();
-  ctx.beginPath(); ctx.arc(p0[0],p0[1],r,-Math.PI/2,-Math.PI/2+Math.PI*2*game.power);
-  ctx.strokeStyle=game.power>0.92?'#FF4D3D':COL.apron; ctx.lineWidth=6; ctx.lineCap='round'; ctx.stroke();
 }
 function drawSpawnBadge(){
   if(game.live) return;
   const b=game.ball;
   const p=proj(b.x,b.y,b.z+2.1);
   ctx.beginPath(); ctx.arc(p[0],p[1],13,0,Math.PI*2);
-  ctx.fillStyle=COL.cream; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=COL.ink; ctx.stroke();
+  ctx.fillStyle=COL.bg; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=COL.ink; ctx.stroke();
   ctx.fillStyle=COL.ink; ctx.font='900 15px Archivo, sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(game.spawnPts+'', p[0], p[1]+1);
 }
 
-/* ---------------- flash ---------------- */
 let flash=0;
 function drawFlash(){
   if(flash<=0) return;
   ctx.save(); ctx.globalAlpha=Math.min(1,flash);
-  ctx.fillStyle=COL.cream; ctx.font='900 62px Archivo, sans-serif';
+  ctx.fillStyle=COL.paint; ctx.font='900 62px Archivo, sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.lineWidth=7; ctx.strokeStyle=COL.ink;
   const txt='+'+game.spawnPts;
-  ctx.strokeText(txt, W/2, H*0.34); ctx.fillText(txt, W/2, H*0.34);
+  ctx.strokeText(txt, W/2, H*0.30); ctx.fillText(txt, W/2, H*0.30);
   ctx.restore();
 }
 
@@ -608,11 +601,11 @@ function frame(now){
     hoopUpdate(DT);
     if(game.live){
       const r=stepBall(game.ball, DT, true);
-      if(r==='make' && !game.madeAt){
-        game.makes++; game.score+=game.spawnPts; flash=1.1;
-        game.madeAt=now; game.resetAt=now+600; syncHUD();
+      if(r==='make' && !game.resetAt){
+        game.makes++; game.score+=game.spawnPts; flash=1.1; syncHUD();
+        game.resetAt=now+600;
       } else if(r==='rest' && !game.resetAt){
-        game.rest+=DT; if(game.rest>0.35) game.resetAt=now+150;
+        game.resetAt=now+150;
       }
     }
     acc-=DT;
@@ -620,16 +613,23 @@ function frame(now){
   if(game.resetAt && now>=game.resetAt) spawnBall();
   if(flash>0) flash-=dt*1.4;
 
-  drawBackground(); drawSlab(); courtLines(); drawFence();
-  drawHoop(); drawAim(); drawBall(); drawSpawnBadge(); drawFlash();
+  drawBackground(); drawCourt();
+  drawHoopShadow();
+  const netPre = netStrandsSplit();
+  drawRimAndBackboard(netPre);
+  drawAim();
+  drawBall();
+  drawSpawnBadge();
+  drawFlash();
   requestAnimationFrame(frame);
 }
+
 /* ---------------- boot ---------------- */
 window.addEventListener('resize',resize);
 window.addEventListener('orientationchange',()=>setTimeout(resize,150));
-// debug handle (used by the automated smoke test)
-window.__iso = {game, hoop, proj, spawnBall, launchVector, stepBall, DT, LAUNCH, MAX_SPEED};
+window.__iso = {game, hoop, proj, spawnBall, launchVector, stepBall, DT, LAUNCH, MAX_SPEED, currentDir};
 resize(); hoopUpdate(0); spawnBall(); syncHUD();
+onAimChange(); onPowChange();
 requestAnimationFrame(frame);
 })();
 </script>
