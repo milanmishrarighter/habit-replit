@@ -1,0 +1,7 @@
+{
+  "appId": "com.isohoops.game",
+  "appName": "Iso Hoops",
+  "webDir": "www",
+  "android": { "backgroundColor": "#0FA45C" },
+  "server": { "androidScheme": "https" }
+}
